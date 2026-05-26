@@ -1,3 +1,7 @@
+import sys
+import os
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
+
 import jax
 import jax.numpy as jnp
 from models import make_grid_model, make_random_model, make_random_regular_model, make_maxcut_model, ising_energy, maxcut_value
