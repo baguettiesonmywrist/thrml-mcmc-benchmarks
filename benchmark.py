@@ -75,16 +75,17 @@ def _run_sampler(
     wall_time = time.perf_counter() - t0
 
     # samples: [n_chains, n_samples, n_nodes]
-    # compute energy or cut value at each sample for each chain
+    # compute energy or cut value one chain at a time to avoid OOM on dense graphs
+    # double vmap would materialise [n_chains, n_samples, n_edges] intermediates
     if config.problem == "maxcut":
         metric_fn = lambda s: maxcut_value(config.model, s)
-        # for maxcut, higher is better — negate so "best" = minimum = most negative energy
-        trajectory = jax.vmap(jax.vmap(metric_fn))(samples)
     else:
         metric_fn = lambda s: ising_energy(config.model, s)
-        trajectory = jax.vmap(jax.vmap(metric_fn))(samples)
 
-    trajectory = np.array(trajectory)   # [n_chains, n_samples]
+    trajectory = np.stack([
+        np.array(jax.vmap(metric_fn)(samples[i]))
+        for i in range(config.n_chains)
+    ])  # [n_chains, n_samples]
     best = trajectory.min(axis=1)       # [n_chains] best value per chain
 
     print(f"  [{sampler_name}] done in {wall_time:.2f}s  mean_best={best.mean():.2f}", flush=True)

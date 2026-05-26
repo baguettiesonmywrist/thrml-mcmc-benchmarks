@@ -36,33 +36,38 @@ def run_gibbs(
     n = model.n_nodes
     beta = model.beta
 
-    def gibbs_step(spins: Array, key: Key) -> tuple[Array, None]:
-        k1, k2 = jax.random.split(key)
-        node = jax.random.randint(k1, shape=(), minval=0, maxval=n)
-        local_field = jnp.sum(nbr_J[node] * mask[node] * spins[neighbours[node]])
-        # probability that spin i = +1 given its neighbours
-        p_up = jax.nn.sigmoid(2.0 * beta * local_field)
-        new_spin = jnp.where(jax.random.uniform(k2) < p_up, 1.0, -1.0)
-        spins = spins.at[node].set(new_spin)
-        return spins, None
+    warmup_key, sample_key = jax.random.split(key)
 
-    def sweep(spins: Array, step_keys: Array) -> tuple[Array, None]:
-        spins, _ = jax.lax.scan(gibbs_step, spins, step_keys)
-        return spins, None
+    def do_sweep(spins: Array, sweep_key: Key) -> Array:
+        """Run one sweep of n single-site Gibbs updates."""
+        def gibbs_step(spins: Array, step_idx: int) -> tuple[Array, None]:
+            k = jax.random.fold_in(sweep_key, step_idx)
+            k1, k2 = jax.random.split(k)
+            node = jax.random.randint(k1, shape=(), minval=0, maxval=n)
+            local_field = jnp.sum(nbr_J[node] * mask[node] * spins[neighbours[node]])
+            p_up = jax.nn.sigmoid(2.0 * beta * local_field)
+            new_spin = jnp.where(jax.random.uniform(k2) < p_up, 1.0, -1.0)
+            spins = spins.at[node].set(new_spin)
+            return spins, None
+        spins, _ = jax.lax.scan(gibbs_step, spins, jnp.arange(n))
+        return spins
 
-    def sample_step(spins: Array, sweep_keys: Array) -> tuple[Array, Array]:
-        spins, _ = jax.lax.scan(sweep, spins, sweep_keys)
+    def warmup_sweep(spins: Array, sweep_idx: int) -> tuple[Array, None]:
+        sweep_key = jax.random.fold_in(warmup_key, sweep_idx)
+        return do_sweep(spins, sweep_key), None
+
+    def sample_step(spins: Array, sample_idx: int) -> tuple[Array, Array]:
+        def sub_sweep(spins: Array, sub_idx: int) -> tuple[Array, None]:
+            sweep_key = jax.random.fold_in(jax.random.fold_in(sample_key, sample_idx), sub_idx)
+            return do_sweep(spins, sweep_key), None
+        spins, _ = jax.lax.scan(sub_sweep, spins, jnp.arange(steps_per_sample))
         return spins, spins
-
-    total_sweeps = n_warmup + n_samples * steps_per_sample
-    all_keys = jax.random.split(key, total_sweeps * n).reshape(total_sweeps, n)
 
     spins = init_spins
 
     if n_warmup > 0:
-        spins, _ = jax.lax.scan(sweep, spins, all_keys[:n_warmup])
+        spins, _ = jax.lax.scan(warmup_sweep, spins, jnp.arange(n_warmup))
 
-    sample_keys = all_keys[n_warmup:].reshape(n_samples, steps_per_sample, n)
-    _, samples = jax.lax.scan(sample_step, spins, sample_keys)
+    _, samples = jax.lax.scan(sample_step, spins, jnp.arange(n_samples))
 
     return samples  # [n_samples, n_nodes]
