@@ -1,5 +1,4 @@
 import os
-import re
 from collections import defaultdict
 
 import matplotlib
@@ -29,7 +28,6 @@ def load_result(config_name: str, sampler: str) -> dict | None:
 
 
 def load_all_results() -> dict:
-    """Load all results into a nested dict: results[config_name][sampler] = data."""
     results = defaultdict(dict)
     for fname in os.listdir(RESULTS_DIR):
         if not fname.endswith(".npz"):
@@ -38,6 +36,50 @@ def load_all_results() -> dict:
         if sampler in SAMPLERS:
             results[config_name][sampler] = load_result(config_name, sampler)
     return dict(results)
+
+
+# --- convergence diagnostics ---
+
+def gelman_rubin(chains: np.ndarray) -> float:
+    """R-hat statistic. Values close to 1.0 indicate convergence across chains.
+    Computed on the energy trajectory [n_chains, n_samples]."""
+    n_chains, n_samples = chains.shape
+    if n_chains < 2:
+        return np.nan
+    chain_means = chains.mean(axis=1)
+    grand_mean = chain_means.mean()
+    B = n_samples / (n_chains - 1) * np.sum((chain_means - grand_mean) ** 2)
+    W = np.mean(chains.var(axis=1, ddof=1))
+    if W == 0:
+        return 1.0
+    var_hat = (n_samples - 1) / n_samples * W + B / n_samples
+    return float(np.sqrt(var_hat / W))
+
+
+def effective_sample_size(chain: np.ndarray) -> float:
+    """ESS via integrated autocorrelation time on a single chain [n_samples]."""
+    n = len(chain)
+    centered = chain - chain.mean()
+    # autocorrelation via FFT
+    acf_full = np.fft.irfft(np.abs(np.fft.rfft(centered, n=2 * n)) ** 2)
+    acf = acf_full[:n] / acf_full[0]
+    # Geyer's initial monotone sequence: sum until first negative lag
+    tau = 1.0
+    for k in range(1, n):
+        if acf[k] < 0:
+            break
+        tau += 2 * acf[k]
+    return float(n / tau)
+
+
+def compute_diagnostics(data: dict) -> dict:
+    """Compute R-hat, mean ESS, and ESS/second from a result dict."""
+    traj = data["energy_trajectory"]  # [n_chains, n_samples]
+    r_hat = gelman_rubin(traj)
+    ess_per_chain = [effective_sample_size(traj[i]) for i in range(len(traj))]
+    mean_ess = float(np.mean(ess_per_chain))
+    ess_per_sec = mean_ess / data["wall_time"]
+    return {"r_hat": r_hat, "ess": mean_ess, "ess_per_sec": ess_per_sec}
 
 
 # --- plot helpers ---
@@ -51,27 +93,22 @@ def _save(fig: plt.Figure, name: str) -> None:
 
 
 def _mean_trajectory(data: dict) -> np.ndarray:
-    """Mean energy over chains at each sample step."""
-    return data["energy_trajectory"].mean(axis=0)  # [n_samples]
+    return data["energy_trajectory"].mean(axis=0)
 
 
-# --- plots ---
+# --- comparison plots ---
 
 def plot_convergence(results: dict, config_name: str) -> None:
-    """Energy trajectory over sample steps for all three samplers."""
     fig, ax = plt.subplots(figsize=(7, 4))
-
     for sampler in SAMPLERS:
         data = results.get(config_name, {}).get(sampler)
         if data is None:
             continue
         traj = _mean_trajectory(data)
-        ax.plot(traj, color=COLORS[sampler], label=LABELS[sampler])
-        # shaded band = std across chains
         std = data["energy_trajectory"].std(axis=0)
+        ax.plot(traj, color=COLORS[sampler], label=LABELS[sampler])
         ax.fill_between(range(len(traj)), traj - std, traj + std,
                         color=COLORS[sampler], alpha=0.15)
-
     ax.set_xlabel("Sample step")
     ax.set_ylabel("Mean energy")
     ax.set_title(f"Convergence — {config_name}")
@@ -81,15 +118,12 @@ def plot_convergence(results: dict, config_name: str) -> None:
 
 
 def plot_time_comparison(results: dict, config_names: list[str], title: str, fname: str) -> None:
-    """Bar chart of wall-clock times across configs."""
     x = np.arange(len(config_names))
     width = 0.25
-    fig, ax = plt.subplots(figsize=(max(6, len(config_names) * 1.5), 4))
-
+    fig, ax = plt.subplots(figsize=(max(6, len(config_names) * 1.8), 4))
     for i, sampler in enumerate(SAMPLERS):
         times = [results.get(c, {}).get(sampler, {}).get("wall_time", 0) for c in config_names]
         ax.bar(x + i * width, times, width, label=LABELS[sampler], color=COLORS[sampler])
-
     ax.set_xticks(x + width)
     ax.set_xticklabels(config_names, rotation=30, ha="right", fontsize=8)
     ax.set_ylabel("Wall-clock time (s)")
@@ -100,13 +134,10 @@ def plot_time_comparison(results: dict, config_names: list[str], title: str, fna
 
 
 def plot_scaling(results: dict, config_names: list[str], sizes: list[int], title: str, fname: str) -> None:
-    """Wall-clock time vs system size for each sampler."""
     fig, ax = plt.subplots(figsize=(6, 4))
-
     for sampler in SAMPLERS:
         times = [results.get(c, {}).get(sampler, {}).get("wall_time", np.nan) for c in config_names]
         ax.plot(sizes, times, marker="o", color=COLORS[sampler], label=LABELS[sampler])
-
     ax.set_xlabel("Number of nodes")
     ax.set_ylabel("Wall-clock time (s)")
     ax.set_title(title)
@@ -115,20 +146,18 @@ def plot_scaling(results: dict, config_names: list[str], sizes: list[int], title
     _save(fig, fname)
 
 
-def plot_quality_comparison(results: dict, config_names: list[str], title: str, fname: str) -> None:
-    """Mean best energy per sampler across configs (lower = better for Ising)."""
+def plot_quality_comparison(results: dict, config_names: list[str], title: str,
+                            fname: str, higher_is_better: bool = False) -> None:
     x = np.arange(len(config_names))
     width = 0.25
-    fig, ax = plt.subplots(figsize=(max(6, len(config_names) * 1.5), 4))
-
+    fig, ax = plt.subplots(figsize=(max(6, len(config_names) * 1.8), 4))
     for i, sampler in enumerate(SAMPLERS):
-        means = [results.get(c, {}).get(sampler, {}).get("best_energy", np.array([np.nan])).mean()
-                 for c in config_names]
-        ax.bar(x + i * width, means, width, label=LABELS[sampler], color=COLORS[sampler])
-
+        vals = [results.get(c, {}).get(sampler, {}).get("best_energy", np.array([np.nan])).mean()
+                for c in config_names]
+        ax.bar(x + i * width, vals, width, label=LABELS[sampler], color=COLORS[sampler])
     ax.set_xticks(x + width)
     ax.set_xticklabels(config_names, rotation=30, ha="right", fontsize=8)
-    ax.set_ylabel("Mean best energy")
+    ax.set_ylabel("Mean best cut value" if higher_is_better else "Mean best energy")
     ax.set_title(title)
     ax.legend()
     fig.tight_layout()
@@ -136,12 +165,9 @@ def plot_quality_comparison(results: dict, config_names: list[str], title: str, 
 
 
 def plot_temperature_sweep(results: dict) -> None:
-    """Final mean energy vs beta for each sampler."""
     betas = [0.1, 0.5, 1.0, 2.0]
     config_names = [f"ferro_grid_10x10_beta{b}" for b in betas]
-
     fig, axes = plt.subplots(1, 2, figsize=(12, 4))
-
     for ax, metric, ylabel in zip(
         axes,
         ["best_energy", "wall_time"],
@@ -158,15 +184,70 @@ def plot_temperature_sweep(results: dict) -> None:
                 else:
                     vals.append(data["wall_time"])
             ax.plot(betas, vals, marker="o", color=COLORS[sampler], label=LABELS[sampler])
-
         ax.set_xlabel("Beta (inverse temperature)")
         ax.set_ylabel(ylabel)
         ax.legend()
-
     axes[0].set_title("Solution quality vs temperature")
     axes[1].set_title("Speed vs temperature")
     fig.tight_layout()
     _save(fig, "temperature_sweep")
+
+
+# --- diagnostic plots ---
+
+def plot_diagnostics(results: dict, config_names: list[str], title: str, fname: str) -> None:
+    """R-hat and ESS/second for each sampler across configs."""
+    fig, axes = plt.subplots(1, 2, figsize=(max(10, len(config_names) * 2), 4))
+    x = np.arange(len(config_names))
+    width = 0.25
+
+    for i, sampler in enumerate(SAMPLERS):
+        r_hats, ess_per_secs = [], []
+        for c in config_names:
+            data = results.get(c, {}).get(sampler)
+            if data is None:
+                r_hats.append(np.nan)
+                ess_per_secs.append(np.nan)
+            else:
+                diag = compute_diagnostics(data)
+                r_hats.append(diag["r_hat"])
+                ess_per_secs.append(diag["ess_per_sec"])
+
+        axes[0].bar(x + i * width, r_hats, width, label=LABELS[sampler], color=COLORS[sampler])
+        axes[1].bar(x + i * width, ess_per_secs, width, label=LABELS[sampler], color=COLORS[sampler])
+
+    # R-hat convergence threshold
+    axes[0].axhline(1.1, color="black", linestyle="--", linewidth=1, label="R-hat = 1.1 threshold")
+    axes[0].set_ylabel("R-hat  (lower = better, <1.1 = converged)")
+    axes[0].set_title("Gelman-Rubin R-hat")
+    axes[0].set_xticks(x + width)
+    axes[0].set_xticklabels(config_names, rotation=30, ha="right", fontsize=8)
+    axes[0].legend(fontsize=7)
+
+    axes[1].set_ylabel("ESS / second  (higher = better)")
+    axes[1].set_title("Effective samples per second")
+    axes[1].set_xticks(x + width)
+    axes[1].set_xticklabels(config_names, rotation=30, ha="right", fontsize=8)
+    axes[1].legend(fontsize=7)
+
+    fig.suptitle(title, fontweight="bold")
+    fig.tight_layout()
+    _save(fig, fname)
+
+
+def print_diagnostics_table(results: dict, config_names: list[str]) -> None:
+    """Print R-hat, ESS, and ESS/s for all configs and samplers."""
+    header = f"{'Config':<35} {'Sampler':<28} {'R-hat':>6} {'ESS':>8} {'ESS/s':>10}"
+    print("\n" + header)
+    print("-" * len(header))
+    for c in config_names:
+        for sampler in SAMPLERS:
+            data = results.get(c, {}).get(sampler)
+            if data is None:
+                continue
+            d = compute_diagnostics(data)
+            print(f"{c:<35} {LABELS[sampler]:<28} {d['r_hat']:>6.3f} {d['ess']:>8.1f} {d['ess_per_sec']:>10.1f}")
+    print()
 
 
 # --- main ---
@@ -175,51 +256,68 @@ if __name__ == "__main__":
     results = load_all_results()
     print(f"Loaded results for {len(results)} configs")
 
-    # convergence curves for key configs
-    for config_name in results:
-        if "smoke_test" in config_name:
-            continue
-        plot_convergence(results, config_name)
+    # --- convergence plots (key configs only) ---
+    key_configs = [
+        "ferro_grid_10x10", "ferro_grid_30x30",
+        "antiferro_grid_30x30",
+        "ferro_rrg_900",
+        "maxcut_900",
+    ]
+    for c in key_configs:
+        if c in results:
+            plot_convergence(results, c)
 
-    # size scaling
-    grid_sizes = [10*10, 20*20, 30*30]
-    plot_scaling(
-        results,
-        [f"ferro_grid_{s}x{s}" for s in [10, 20, 30]],
-        grid_sizes,
-        title="Grid — wall-clock time vs system size (ferro)",
-        fname="scaling_grid_ferro",
-    )
-    plot_scaling(
-        results,
-        [f"ferro_rrg_{n}" for n in [100, 400, 900]],
-        [100, 400, 900],
-        title="Random regular graph — wall-clock time vs system size",
-        fname="scaling_rrg",
-    )
-    plot_scaling(
-        results,
-        [f"maxcut_{n}" for n in [100, 400, 900]],
-        [100, 400, 900],
-        title="MaxCut — wall-clock time vs system size",
-        fname="scaling_maxcut",
-    )
+    # --- scaling ---
+    plot_scaling(results, [f"ferro_grid_{s}x{s}" for s in [10, 20, 30]],
+                 [100, 400, 900], title="Grid ferro — scaling", fname="scaling_grid_ferro")
+    plot_scaling(results, [f"antiferro_grid_{s}x{s}" for s in [10, 20, 30]],
+                 [100, 400, 900], title="Grid antiferro — scaling", fname="scaling_grid_antiferro")
+    plot_scaling(results, [f"ferro_rrg_{n}" for n in [100, 400, 900]],
+                 [100, 400, 900], title="Random regular graph — scaling", fname="scaling_rrg")
+    plot_scaling(results, [f"maxcut_{n}" for n in [100, 400, 900]],
+                 [100, 400, 900], title="MaxCut — scaling", fname="scaling_maxcut")
 
-    # time and quality comparisons across topologies
-    plot_time_comparison(
-        results,
-        [f"ferro_grid_{s}x{s}" for s in [10, 20, 30]],
-        title="Wall-clock time — grid ferro",
-        fname="time_grid_ferro",
-    )
-    plot_quality_comparison(
-        results,
-        [f"ferro_grid_{s}x{s}" for s in [10, 20, 30]],
-        title="Solution quality — grid ferro",
-        fname="quality_grid_ferro",
-    )
+    # --- time comparisons ---
+    plot_time_comparison(results, [f"ferro_grid_{s}x{s}" for s in [10, 20, 30]],
+                         title="Wall-clock time — grid ferro", fname="time_grid_ferro")
+    plot_time_comparison(results, [f"antiferro_grid_{s}x{s}" for s in [10, 20, 30]],
+                         title="Wall-clock time — grid antiferro", fname="time_grid_antiferro")
+    plot_time_comparison(results, [f"ferro_rrg_{n}" for n in [100, 400, 900]],
+                         title="Wall-clock time — random regular graph", fname="time_rrg")
+    plot_time_comparison(results, [f"maxcut_{n}" for n in [100, 400, 900]],
+                         title="Wall-clock time — MaxCut", fname="time_maxcut")
 
-    # temperature sweep
+    # --- quality comparisons ---
+    plot_quality_comparison(results, [f"ferro_grid_{s}x{s}" for s in [10, 20, 30]],
+                            title="Solution quality — grid ferro", fname="quality_grid_ferro")
+    plot_quality_comparison(results, [f"antiferro_grid_{s}x{s}" for s in [10, 20, 30]],
+                            title="Solution quality — grid antiferro", fname="quality_grid_antiferro")
+    plot_quality_comparison(results, [f"ferro_rrg_{n}" for n in [100, 400, 900]],
+                            title="Solution quality — random regular graph", fname="quality_rrg")
+    plot_quality_comparison(results, [f"maxcut_{n}" for n in [100, 400, 900]],
+                            title="Solution quality — MaxCut", fname="quality_maxcut",
+                            higher_is_better=True)
+
+    # --- temperature sweep ---
     plot_temperature_sweep(results)
+
+    # --- convergence diagnostics ---
+    grid_configs = [f"ferro_grid_{s}x{s}" for s in [10, 20, 30]]
+    antiferro_configs = [f"antiferro_grid_{s}x{s}" for s in [10, 20, 30]]
+    rrg_configs = [f"ferro_rrg_{n}" for n in [100, 400, 900]]
+    maxcut_configs = [f"maxcut_{n}" for n in [100, 400, 900]]
+
+    plot_diagnostics(results, grid_configs,
+                     title="Diagnostics — grid ferro", fname="diagnostics_grid_ferro")
+    plot_diagnostics(results, antiferro_configs,
+                     title="Diagnostics — grid antiferro", fname="diagnostics_grid_antiferro")
+    plot_diagnostics(results, rrg_configs,
+                     title="Diagnostics — random regular graph", fname="diagnostics_rrg")
+    plot_diagnostics(results, maxcut_configs,
+                     title="Diagnostics — MaxCut", fname="diagnostics_maxcut")
+
+    # --- print diagnostics table ---
+    all_configs = grid_configs + antiferro_configs + rrg_configs + maxcut_configs
+    print_diagnostics_table(results, all_configs)
 
     print("All plots saved.")

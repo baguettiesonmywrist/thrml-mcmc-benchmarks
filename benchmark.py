@@ -86,7 +86,8 @@ def _run_sampler(
         np.array(jax.vmap(metric_fn)(samples[i]))
         for i in range(config.n_chains)
     ])  # [n_chains, n_samples]
-    best = trajectory.min(axis=1)       # [n_chains] best value per chain
+    # for Ising lower is better (energy), for MaxCut higher is better (cut value)
+    best = trajectory.max(axis=1) if config.problem == "maxcut" else trajectory.min(axis=1)
 
     print(f"  [{sampler_name}] done in {wall_time:.2f}s  mean_best={best.mean():.2f}", flush=True)
 
