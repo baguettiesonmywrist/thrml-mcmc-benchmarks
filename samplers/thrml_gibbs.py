@@ -9,7 +9,6 @@ from thrml.models.ising import IsingEBM, IsingSamplingProgram
 
 from models import IsingModel
 
-
 def _build_program(model: IsingModel):
     """Convert IsingModel to a THRML sampling program.
 
@@ -31,7 +30,7 @@ def _build_program(model: IsingModel):
     G.add_nodes_from(range(n))
     G.add_edges_from(zip(src, dst))
 
-    # colour the graph — non-adjacent nodes share a colour and can be updated in parallel
+    # colour the graph - non-adjacent nodes share a colour and can be updated in parallel
     coloring = nx.coloring.greedy_color(G, strategy="DSATUR")
     n_colors = max(coloring.values()) + 1
     color_groups = [[] for _ in range(n_colors)]
@@ -47,7 +46,6 @@ def _build_program(model: IsingModel):
     program = IsingSamplingProgram(ising_ebm, free_blocks, clamped_blocks=[])
 
     return program, free_blocks, nodes, color_groups
-
 
 def run_thrml(
     key: Key,

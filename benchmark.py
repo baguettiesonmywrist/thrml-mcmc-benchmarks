@@ -21,29 +21,24 @@ from samplers.thrml_gibbs import run_thrml
 
 RESULTS_DIR = "results"
 
-
 @dataclass
 class BenchmarkConfig:
-    name: str          # unique identifier for this config, used in filenames
-    model: IsingModel  # the problem instance
-    problem: str       # "ferro", "antiferro", or "maxcut"
-    n_chains: int      # number of parallel chains (vmap)
-    n_warmup: int      # sweeps before collecting samples
-    n_samples: int     # samples to collect per chain
+    name: str               # unique identifier for this config, used in filenames
+    model: IsingModel       # the problem instance
+    problem: str            # "ferro", "antiferro", or "maxcut"
+    n_chains: int           # number of parallel chains (vmap)
+    n_warmup: int           # sweeps before collecting samples
+    n_samples: int          # samples to collect per chain
     steps_per_sample: int
-
 
 @dataclass
 class BenchmarkResult:
     config_name: str
-    sampler: str            # "mh", "gibbs", or "thrml"
+    sampler: str                   # "mh", "gibbs", or "thrml"
     energy_trajectory: np.ndarray  # [n_chains, n_samples] energy at each sample
     best_energy: np.ndarray        # [n_chains] minimum energy found per chain
     wall_time: float               # seconds, excludes jit compilation
     output_memory_bytes: float     # output array footprint: n_chains × n_samples × n_nodes × 4 bytes
-
-
-
 
 def _run_sampler(
     key: jax.Array,
@@ -104,9 +99,7 @@ def _run_sampler(
         output_memory_bytes=output_memory,
     )
 
-
 N_RUNS = 3
-
 
 def save_result(result: BenchmarkResult, run_idx: int) -> None:
     os.makedirs(RESULTS_DIR, exist_ok=True)
@@ -118,8 +111,7 @@ def save_result(result: BenchmarkResult, run_idx: int) -> None:
         wall_time=np.array(result.wall_time),
         output_memory_bytes=np.array(result.output_memory_bytes),
     )
-    print(f"  saved → {path}")
-
+    print(f"  saved -> {path}")
 
 def run_benchmark(key: jax.Array, config: BenchmarkConfig) -> None:
     print(f"\n=== {config.name} ===")
@@ -129,7 +121,6 @@ def run_benchmark(key: jax.Array, config: BenchmarkConfig) -> None:
             key, subkey = jax.random.split(key)
             result = _run_sampler(subkey, config, run_fn, sampler_name)
             save_result(result, run_idx)
-
 
 # --- experiment configs ---
 
@@ -171,7 +162,7 @@ def make_configs() -> list[BenchmarkConfig]:
             **sampling_kwargs,
         ))
 
-    # maxcut on random regular graph — degree sweep at same sizes as RRG
+    # maxcut on random regular graph - degree sweep at same sizes as RRG
     for degree in [3, 5]:
         for n_nodes in [900, 1600, 2500]:
             configs.append(BenchmarkConfig(
@@ -183,11 +174,10 @@ def make_configs() -> list[BenchmarkConfig]:
 
     return configs
 
-
 if __name__ == "__main__":
     key = jax.random.key(0)
     configs = make_configs()
-    print(f"Running {len(configs)} configs × 3 samplers")
+    print(f"Running {len(configs)} configs x 3 samplers")
     for config in configs:
         key, subkey = jax.random.split(key)
         run_benchmark(subkey, config)

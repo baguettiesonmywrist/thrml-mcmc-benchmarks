@@ -12,7 +12,6 @@ SAMPLERS = ["mh", "gibbs", "thrml"]
 COLORS = {"mh": "#e41a1c", "gibbs": "#377eb8", "thrml": "#4daf4a"}
 LABELS = {"mh": "Metropolis-Hastings", "gibbs": "Standard Gibbs", "thrml": "Block Gibbs (THRML)"}
 
-
 # --- loading ---
 
 def load_result(config_name: str, sampler: str) -> dict | None:
@@ -33,7 +32,6 @@ def load_result(config_name: str, sampler: str) -> dict | None:
         "output_memory_bytes": float(runs[0]["output_memory_bytes"]) if "output_memory_bytes" in runs[0].files else -1.0,
     }
 
-
 def load_all_results() -> dict:
     results = defaultdict(dict)
     seen = set()
@@ -53,7 +51,6 @@ def load_all_results() -> dict:
             results[config_name][sampler] = load_result(config_name, sampler)
     return dict(results)
 
-
 # --- convergence diagnostics ---
 
 def gelman_rubin(chains: np.ndarray) -> float:
@@ -71,7 +68,6 @@ def gelman_rubin(chains: np.ndarray) -> float:
     var_hat = (n_samples - 1) / n_samples * W + B / n_samples
     return float(np.sqrt(var_hat / W))
 
-
 def effective_sample_size(chain: np.ndarray) -> float:
     """ESS via integrated autocorrelation time on a single chain [n_samples]."""
     n = len(chain)
@@ -87,7 +83,6 @@ def effective_sample_size(chain: np.ndarray) -> float:
         tau += 2 * acf[k]
     return float(n / tau)
 
-
 def compute_diagnostics(data: dict) -> dict:
     """Compute R-hat, mean ESS, and ESS/second from a result dict."""
     traj = data["energy_trajectory"]  # [n_chains, n_samples]
@@ -97,7 +92,6 @@ def compute_diagnostics(data: dict) -> dict:
     ess_per_sec = mean_ess / data["wall_time"]
     return {"r_hat": r_hat, "ess": mean_ess, "ess_per_sec": ess_per_sec}
 
-
 # --- plot helpers ---
 
 def _save(fig: plt.Figure, name: str) -> None:
@@ -105,12 +99,11 @@ def _save(fig: plt.Figure, name: str) -> None:
     path = os.path.join(PLOTS_DIR, f"{name}.png")
     fig.savefig(path, dpi=150, bbox_inches="tight")
     plt.close(fig)
-    print(f"saved → {path}")
+    print(f"saved -> {path}")
 
 
 def _mean_trajectory(data: dict) -> np.ndarray:
     return data["energy_trajectory"].mean(axis=0)
-
 
 # --- comparison plots ---
 
@@ -132,7 +125,6 @@ def plot_convergence(results: dict, config_name: str) -> None:
     fig.tight_layout()
     _save(fig, f"convergence__{config_name}")
 
-
 def plot_memory_comparison(results: dict, config_names: list[str], title: str, fname: str) -> None:
     x = np.arange(len(config_names))
     width = 0.25
@@ -151,7 +143,6 @@ def plot_memory_comparison(results: dict, config_names: list[str], title: str, f
     fig.tight_layout()
     _save(fig, fname)
 
-
 def plot_time_comparison(results: dict, config_names: list[str], title: str, fname: str) -> None:
     x = np.arange(len(config_names))
     width = 0.25
@@ -168,7 +159,6 @@ def plot_time_comparison(results: dict, config_names: list[str], title: str, fna
     fig.tight_layout()
     _save(fig, fname)
 
-
 def plot_scaling(results: dict, config_names: list[str], sizes: list[int], title: str, fname: str) -> None:
     fig, ax = plt.subplots(figsize=(6, 4))
     for sampler in SAMPLERS:
@@ -181,7 +171,6 @@ def plot_scaling(results: dict, config_names: list[str], sizes: list[int], title
     ax.legend()
     fig.tight_layout()
     _save(fig, fname)
-
 
 def plot_quality_comparison(results: dict, config_names: list[str], title: str,
                             fname: str, higher_is_better: bool = False) -> None:
@@ -200,11 +189,10 @@ def plot_quality_comparison(results: dict, config_names: list[str], title: str,
     fig.tight_layout()
     _save(fig, fname)
 
-
 def plot_temperature_sweep(results: dict) -> None:
     betas = [0.1, 0.5, 1.0, 2.0]
     config_names = [f"ferro_grid_70x70_beta{b}" for b in betas]
-    fig, axes = plt.subplots(1, 2, figsize=(12, 4))
+    fig, axes = plt.subplots(2, 1, figsize=(6, 8))
     for ax, metric, ylabel in zip(
         axes,
         ["best_energy", "wall_time"],
@@ -225,16 +213,17 @@ def plot_temperature_sweep(results: dict) -> None:
         ax.set_ylabel(ylabel)
         ax.legend()
     axes[0].set_title("Solution quality vs temperature")
+    axes[1].set_yscale("log")
+    axes[1].set_ylabel("Wall-clock time (s)  [log scale]")
     axes[1].set_title("Speed vs temperature")
     fig.tight_layout()
     _save(fig, "temperature_sweep")
-
 
 # --- diagnostic plots ---
 
 def plot_diagnostics(results: dict, config_names: list[str], title: str, fname: str) -> None:
     """R-hat and ESS/second for each sampler across configs."""
-    fig, axes = plt.subplots(1, 2, figsize=(max(10, len(config_names) * 2), 4))
+    fig, axes = plt.subplots(2, 1, figsize=(max(6, len(config_names) * 1.5), 8))
     x = np.arange(len(config_names))
     width = 0.25
 
@@ -272,7 +261,6 @@ def plot_diagnostics(results: dict, config_names: list[str], title: str, fname: 
     fig.tight_layout()
     _save(fig, fname)
 
-
 def print_diagnostics_table(results: dict, config_names: list[str]) -> None:
     """Save R-hat, ESS, ESS/s, output memory, and mean best energy/cut to results_summary.txt."""
     header = (f"{'Config':<35} {'Sampler':<28} {'R-hat':>6} {'ESS':>8} {'ESS/s':>10}"
@@ -295,7 +283,6 @@ def print_diagnostics_table(results: dict, config_names: list[str]) -> None:
     with open("results_summary.txt", "w") as f:
         f.write(output)
     print("saved → results_summary.txt")
-
 
 # --- main ---
 

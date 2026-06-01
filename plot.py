@@ -12,7 +12,6 @@ SAMPLERS = ["mh", "gibbs", "thrml"]
 COLORS = {"mh": "#e41a1c", "gibbs": "#377eb8", "thrml": "#4daf4a"}
 LABELS = {"mh": "Metropolis-Hastings", "gibbs": "Standard Gibbs", "thrml": "Block Gibbs (THRML)"}
 
-
 def _load(config_name: str, sampler: str) -> dict | None:
     """Load run 0 for visualisation."""
     path = os.path.join(RESULTS_DIR, f"{config_name}__{sampler}__run0.npz")
@@ -26,14 +25,12 @@ def _load(config_name: str, sampler: str) -> dict | None:
         "output_memory_bytes": float(d["output_memory_bytes"]) if "output_memory_bytes" in d.files else -1.0,
     }
 
-
 def _save(fig: plt.Figure, name: str) -> None:
     os.makedirs(PLOTS_DIR, exist_ok=True)
     path = os.path.join(PLOTS_DIR, f"{name}.png")
     fig.savefig(path, dpi=150, bbox_inches="tight")
     plt.close(fig)
-    print(f"saved → {path}")
-
+    print(f"saved -> {path}")
 
 def _parse_params(config_name: str) -> str:
     """Extract readable parameter string from config name for plot title."""
@@ -48,7 +45,6 @@ def _parse_params(config_name: str) -> str:
     if m:
         return f"MaxCut  |  {m.group(1)} nodes"
     return config_name
-
 
 def plot_detail(config_name: str) -> None:
     """Per-config plot: energy trace + distribution + summary stats."""
@@ -117,7 +113,6 @@ def plot_detail(config_name: str) -> None:
 
     fig.tight_layout(rect=[0, 0.12, 1, 1])
     _save(fig, f"detail__{config_name}")
-
 
 if __name__ == "__main__":
     config_names = set()
