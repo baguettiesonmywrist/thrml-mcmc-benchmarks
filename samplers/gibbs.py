@@ -18,7 +18,7 @@ def run_gibbs(
     """Run single-site Gibbs sampling on an Ising model.
 
     Each step samples spin i exactly from its conditional distribution.
-    No accept/reject — unlike MH, every proposal is always accepted.
+    Every proposal is always accepted.
     One sweep = n_nodes steps.
 
     Args:

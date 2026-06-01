@@ -5,14 +5,13 @@ from jaxtyping import Array, Key
 
 from models import IsingModel
 
-
 def _build_neighbour_list(model: IsingModel) -> tuple[Array, Array, Array]:
     """Build padded neighbour arrays from edge list.
 
     Returns:
-        neighbours:  [n_nodes, max_degree]  - neighbour indices
-        nbr_J:       [n_nodes, max_degree]  - coupling to each neighbour
-        mask:        [n_nodes, max_degree]  - True for real neighbours, False for padding
+        neighbours:  [n_nodes, max_degree] - neighbour indices
+        nbr_J:       [n_nodes, max_degree] - coupling to each neighbour
+        mask:        [n_nodes, max_degree] - True for real neighbours, False for padding
     """
     n = model.n_nodes
     src = np.array(model.edge_src)
@@ -34,7 +33,6 @@ def _build_neighbour_list(model: IsingModel) -> tuple[Array, Array, Array]:
         neighbours[d, count[d]] = s;  nbr_J[d, count[d]] = J[e];  mask[d, count[d]] = True;  count[d] += 1
 
     return jnp.array(neighbours), jnp.array(nbr_J), jnp.array(mask)
-
 
 def run_mh(
     key: Key,
@@ -64,7 +62,7 @@ def run_mh(
     n = model.n_nodes
     beta = model.beta
 
-    # split once into two keys — avoids materialising O(n * n_sweeps) keys in GPU memory
+    # split once into two keys - avoids materialising O(n * n_sweeps) keys in GPU memory
     warmup_key, sample_key = jax.random.split(key)
 
     def do_sweep(spins: Array, sweep_key: Key) -> Array:
