@@ -4,7 +4,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 import jax
 import jax.numpy as jnp
-from models import make_grid_model, make_random_model, make_random_regular_model, make_maxcut_model, ising_energy, maxcut_value
+from models import make_grid_model, make_random_regular_model, make_maxcut_rrg_model, ising_energy, maxcut_value
 
 key = jax.random.key(0)
 
@@ -39,8 +39,10 @@ print(f"Random regular: {model_rr.n_nodes} nodes, {len(model_rr.edge_src)} edges
 assert model_rr.n_nodes == 100
 assert len(model_rr.edge_src) == 150, f"expected 150 edges, got {len(model_rr.edge_src)}"
 
-# --- maxcut ---
-model_mc = make_maxcut_model(n_nodes=20, edge_prob=0.4, beta=1.0)
+# --- maxcut on RRG ---
+model_mc = make_maxcut_rrg_model(n_nodes=20, degree=3, beta=1.0)
+print(f"MaxCut RRG: {model_mc.n_nodes} nodes, {len(model_mc.edge_src)} edges (expect 30)")
+assert len(model_mc.edge_src) == 30, f"expected 30 edges, got {len(model_mc.edge_src)}"
 spins_mc = jax.random.choice(key, jnp.array([-1.0, 1.0]), shape=(model_mc.n_nodes,))
 cut = maxcut_value(model_mc, spins_mc)
 print(f"MaxCut value: {cut:.0f} (out of {len(model_mc.edge_src)} edges)")
