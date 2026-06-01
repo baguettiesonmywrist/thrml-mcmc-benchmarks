@@ -172,6 +172,25 @@ def plot_scaling(results: dict, config_names: list[str], sizes: list[int], title
     fig.tight_layout()
     _save(fig, fname)
 
+def plot_ess_scaling(results: dict, config_names: list[str], sizes: list[int], title: str, fname: str) -> None:
+    fig, ax = plt.subplots(figsize=(6, 4))
+    for sampler in SAMPLERS:
+        ess_per_secs = []
+        for c in config_names:
+            data = results.get(c, {}).get(sampler)
+            if data is None:
+                ess_per_secs.append(np.nan)
+            else:
+                ess_per_secs.append(compute_diagnostics(data)["ess_per_sec"])
+        ax.plot(sizes, ess_per_secs, marker="o", color=COLORS[sampler], label=LABELS[sampler])
+    ax.set_xlabel("Number of nodes")
+    ax.set_yscale("log")
+    ax.set_ylabel("ESS / second  [log scale]")
+    ax.set_title(title)
+    ax.legend()
+    fig.tight_layout()
+    _save(fig, fname)
+
 def plot_quality_comparison(results: dict, config_names: list[str], title: str,
                             fname: str, higher_is_better: bool = False) -> None:
     x = np.arange(len(config_names))
@@ -318,6 +337,18 @@ if __name__ == "__main__":
                  maxcut_nodes, title="MaxCut degree-3 — scaling", fname="scaling_maxcut_d3")
     plot_scaling(results, [f"maxcut_d5_{n}" for n in maxcut_nodes],
                  maxcut_nodes, title="MaxCut degree-5 — scaling", fname="scaling_maxcut_d5")
+
+    # --- ESS/s scaling ---
+    plot_ess_scaling(results, [f"ferro_grid_{s}x{s}" for s in grid_sides],
+                    grid_nodes, title="Grid ferro — ESS/s scaling", fname="ess_scaling_grid_ferro")
+    plot_ess_scaling(results, [f"antiferro_grid_{s}x{s}" for s in grid_sides],
+                    grid_nodes, title="Grid antiferro — ESS/s scaling", fname="ess_scaling_grid_antiferro")
+    plot_ess_scaling(results, [f"ferro_rrg_{n}" for n in rrg_nodes],
+                    rrg_nodes, title="Random regular graph — ESS/s scaling", fname="ess_scaling_rrg")
+    plot_ess_scaling(results, [f"maxcut_d3_{n}" for n in maxcut_nodes],
+                    maxcut_nodes, title="MaxCut degree-3 — ESS/s scaling", fname="ess_scaling_maxcut_d3")
+    plot_ess_scaling(results, [f"maxcut_d5_{n}" for n in maxcut_nodes],
+                    maxcut_nodes, title="MaxCut degree-5 — ESS/s scaling", fname="ess_scaling_maxcut_d5")
 
     # --- time comparisons ---
     plot_time_comparison(results, [f"ferro_grid_{s}x{s}" for s in grid_sides],
