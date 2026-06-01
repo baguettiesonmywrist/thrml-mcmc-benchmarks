@@ -2,66 +2,78 @@ Config                              Comparison        p-value       r  sig
 
 --- Grid ferro ---
 --------------------------------------------------------------------------
-ferro_grid_10x10                    THRML vs MH        1.0000   0.000  ns   
-ferro_grid_10x10                    THRML vs Gibbs     1.0000   0.000  ns   
-ferro_grid_10x10                    MH vs Gibbs        1.0000   0.000  ns   
-ferro_grid_20x20                    THRML vs MH        0.0433  -0.080  *    ← THRML better
-ferro_grid_20x20                    THRML vs Gibbs     0.0433  -0.080  *    ← THRML better
-ferro_grid_20x20                    MH vs Gibbs        0.9825   0.002  ns   
-ferro_grid_30x30                    THRML vs MH        0.2940   0.090  ns   
-ferro_grid_30x30                    THRML vs Gibbs     0.4533   0.064  ns   
-ferro_grid_30x30                    MH vs Gibbs        0.8356  -0.017  ns   
+ferro_grid_50x50                    THRML vs MH        0.7929  -0.014  ns   
+ferro_grid_50x50                    THRML vs Gibbs     0.2996  -0.058  ns   
+ferro_grid_50x50                    MH vs Gibbs        0.4206  -0.045  ns   
+ferro_grid_70x70                    THRML vs MH        0.7807  -0.016  ns   
+ferro_grid_70x70                    THRML vs Gibbs     0.0000  -0.312  ***  ← THRML better
+ferro_grid_70x70                    MH vs Gibbs        0.0000  -0.297  ***  ← MH better
+ferro_grid_100x100                  THRML vs MH        0.2523  -0.076  ns   
+ferro_grid_100x100                  THRML vs Gibbs     0.0000  -0.480  ***  ← THRML better
+ferro_grid_100x100                  MH vs Gibbs        0.0000  -0.450  ***  ← MH better
 
 --- Grid antiferro ---
 --------------------------------------------------------------------------
-antiferro_grid_10x10                THRML vs MH        1.0000   0.000  ns   
-antiferro_grid_10x10                THRML vs Gibbs     1.0000   0.000  ns   
-antiferro_grid_10x10                MH vs Gibbs        1.0000   0.000  ns   
-antiferro_grid_20x20                THRML vs MH        1.0000   0.000  ns   
-antiferro_grid_20x20                THRML vs Gibbs     0.0822  -0.060  ns   
-antiferro_grid_20x20                MH vs Gibbs        0.0822  -0.060  ns   
-antiferro_grid_30x30                THRML vs MH        0.1755   0.103  ns   
-antiferro_grid_30x30                THRML vs Gibbs     0.2942  -0.094  ns   
-antiferro_grid_30x30                MH vs Gibbs        0.0218  -0.190  *    ← MH better
+antiferro_grid_50x50                THRML vs MH        0.5878  -0.029  ns   
+antiferro_grid_50x50                THRML vs Gibbs     0.0404  -0.114  *    ← THRML better
+antiferro_grid_50x50                MH vs Gibbs        0.1168  -0.088  ns   
+antiferro_grid_70x70                THRML vs MH        0.9650  -0.003  ns   
+antiferro_grid_70x70                THRML vs Gibbs     0.0004  -0.220  ***  ← THRML better
+antiferro_grid_70x70                MH vs Gibbs        0.0003  -0.226  ***  ← MH better
+antiferro_grid_100x100              THRML vs MH        0.0012  -0.214  **   ← THRML better
+antiferro_grid_100x100              THRML vs Gibbs     0.0000  -0.515  ***  ← THRML better
+antiferro_grid_100x100              MH vs Gibbs        0.0000  -0.334  ***  ← MH better
 
 --- Temp sweep ---
 --------------------------------------------------------------------------
-ferro_grid_10x10_beta0.1            THRML vs MH        0.3326   0.112  ns   
-ferro_grid_10x10_beta0.1            THRML vs Gibbs     0.3578  -0.106  ns   
-ferro_grid_10x10_beta0.1            MH vs Gibbs        0.0553  -0.221  ns   
-ferro_grid_10x10_beta0.5            THRML vs MH        0.4222  -0.083  ns   
-ferro_grid_10x10_beta0.5            THRML vs Gibbs     0.0729   0.165  ns   
-ferro_grid_10x10_beta0.5            MH vs Gibbs        0.0061   0.267  **   ← Gibbs better
-ferro_grid_10x10_beta1.0            THRML vs MH        1.0000   0.000  ns   
-ferro_grid_10x10_beta1.0            THRML vs Gibbs     1.0000   0.000  ns   
-ferro_grid_10x10_beta1.0            MH vs Gibbs        1.0000   0.000  ns   
-ferro_grid_10x10_beta2.0            THRML vs MH        0.1594  -0.040  ns   
-ferro_grid_10x10_beta2.0            THRML vs Gibbs     0.0230  -0.100  *    ← THRML better
-ferro_grid_10x10_beta2.0            MH vs Gibbs        0.2452  -0.060  ns   
+ferro_grid_70x70_beta0.1            THRML vs MH        0.0649  -0.123  ns   
+ferro_grid_70x70_beta0.1            THRML vs Gibbs     0.2311  -0.080  ns   
+ferro_grid_70x70_beta0.1            MH vs Gibbs        0.5345   0.042  ns   
+ferro_grid_70x70_beta0.5            THRML vs MH        0.3368  -0.064  ns   
+ferro_grid_70x70_beta0.5            THRML vs Gibbs     0.0000  -0.308  ***  ← THRML better
+ferro_grid_70x70_beta0.5            MH vs Gibbs        0.0002  -0.252  ***  ← MH better
+ferro_grid_70x70_beta1.0            THRML vs MH        0.2941  -0.062  ns   
+ferro_grid_70x70_beta1.0            THRML vs Gibbs     0.0001  -0.253  ***  ← THRML better
+ferro_grid_70x70_beta1.0            MH vs Gibbs        0.0029  -0.189  **   ← MH better
+ferro_grid_70x70_beta2.0            THRML vs MH        0.0280   0.125  *    ← MH better
+ferro_grid_70x70_beta2.0            THRML vs Gibbs     0.0024  -0.190  **   ← THRML better
+ferro_grid_70x70_beta2.0            MH vs Gibbs        0.0000  -0.323  ***  ← MH better
 
 --- RRG ---
 --------------------------------------------------------------------------
-ferro_rrg_100                       THRML vs MH        1.0000   0.000  ns   
-ferro_rrg_100                       THRML vs Gibbs     1.0000   0.000  ns   
-ferro_rrg_100                       MH vs Gibbs        1.0000   0.000  ns   
-ferro_rrg_400                       THRML vs MH        1.0000   0.000  ns   
-ferro_rrg_400                       THRML vs Gibbs     1.0000   0.000  ns   
-ferro_rrg_400                       MH vs Gibbs        1.0000   0.000  ns   
 ferro_rrg_900                       THRML vs MH        1.0000   0.000  ns   
 ferro_rrg_900                       THRML vs Gibbs     1.0000   0.000  ns   
 ferro_rrg_900                       MH vs Gibbs        1.0000   0.000  ns   
+ferro_rrg_1600                      THRML vs MH        0.0320  -0.040  *    ← THRML better
+ferro_rrg_1600                      THRML vs Gibbs     0.0033  -0.067  **   ← THRML better
+ferro_rrg_1600                      MH vs Gibbs        0.3324  -0.027  ns   
+ferro_rrg_2500                      THRML vs MH        0.4842  -0.043  ns   
+ferro_rrg_2500                      THRML vs Gibbs     0.3901   0.052  ns   
+ferro_rrg_2500                      MH vs Gibbs        0.1267   0.093  ns   
 
---- MaxCut ---
+--- MaxCut d3 ---
 --------------------------------------------------------------------------
-maxcut_100                          THRML vs MH        0.9369   0.008  ns   
-maxcut_100                          THRML vs Gibbs     0.5097   0.068  ns   
-maxcut_100                          MH vs Gibbs        0.5826   0.058  ns   
-maxcut_400                          THRML vs MH        0.3257   0.114  ns   
-maxcut_400                          THRML vs Gibbs     0.3073   0.119  ns   
-maxcut_400                          MH vs Gibbs        0.9807  -0.003  ns   
-maxcut_900                          THRML vs MH        0.2223   0.142  ns   
-maxcut_900                          THRML vs Gibbs     0.1961   0.150  ns   
-maxcut_900                          MH vs Gibbs        0.9588  -0.006  ns   
+maxcut_d3_900                       THRML vs MH        0.0268   0.147  *    ← THRML better
+maxcut_d3_900                       THRML vs Gibbs     0.0199   0.155  *    ← THRML better
+maxcut_d3_900                       MH vs Gibbs        0.9101   0.008  ns   
+maxcut_d3_1600                      THRML vs MH        0.4094   0.055  ns   
+maxcut_d3_1600                      THRML vs Gibbs     0.1740   0.091  ns   
+maxcut_d3_1600                      MH vs Gibbs        0.6584   0.030  ns   
+maxcut_d3_2500                      THRML vs MH        0.0029   0.199  **   ← THRML better
+maxcut_d3_2500                      THRML vs Gibbs     0.0009   0.222  ***  ← THRML better
+maxcut_d3_2500                      MH vs Gibbs        0.7500   0.021  ns   
+
+--- MaxCut d5 ---
+--------------------------------------------------------------------------
+maxcut_d5_900                       THRML vs MH        0.0132   0.165  *    ← THRML better
+maxcut_d5_900                       THRML vs Gibbs     0.1567   0.094  ns   
+maxcut_d5_900                       MH vs Gibbs        0.3300  -0.065  ns   
+maxcut_d5_1600                      THRML vs MH        0.0120   0.168  *    ← THRML better
+maxcut_d5_1600                      THRML vs Gibbs     0.0378   0.138  *    ← THRML better
+maxcut_d5_1600                      MH vs Gibbs        0.6696  -0.028  ns   
+maxcut_d5_2500                      THRML vs MH        0.0001   0.265  ***  ← THRML better
+maxcut_d5_2500                      THRML vs Gibbs     0.0000   0.336  ***  ← THRML better
+maxcut_d5_2500                      MH vs Gibbs        0.2650   0.074  ns   
 
 Significance: *** p<0.001  ** p<0.01  * p<0.05  ns = not significant
 r = rank-biserial effect size (0 = no difference, ±1 = complete separation)

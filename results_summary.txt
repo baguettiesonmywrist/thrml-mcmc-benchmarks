@@ -1,38 +1,59 @@
-Config                              Sampler                       R-hat      ESS      ESS/s
--------------------------------------------------------------------------------------------
-ferro_grid_10x10                    Metropolis-Hastings           1.012    386.2      123.4
-ferro_grid_10x10                    Standard Gibbs                1.000    424.5      132.7
-ferro_grid_10x10                    Block Gibbs (THRML)           1.000    471.9     4059.3
-ferro_grid_20x20                    Metropolis-Hastings           1.712    334.3       28.6
-ferro_grid_20x20                    Standard Gibbs                1.697    212.6       17.2
-ferro_grid_20x20                    Block Gibbs (THRML)           1.088    393.8     4660.7
-ferro_grid_30x30                    Metropolis-Hastings           2.293    159.8        5.5
-ferro_grid_30x30                    Standard Gibbs                1.825     99.8        3.5
-ferro_grid_30x30                    Block Gibbs (THRML)           2.874    272.4     1846.6
-antiferro_grid_10x10                Metropolis-Hastings           1.000    432.7      143.0
-antiferro_grid_10x10                Standard Gibbs                1.030    391.3      120.9
-antiferro_grid_10x10                Block Gibbs (THRML)           1.010    446.9     7198.2
-antiferro_grid_20x20                Metropolis-Hastings           1.343    378.8       25.9
-antiferro_grid_20x20                Standard Gibbs                1.629    185.0       15.1
-antiferro_grid_20x20                Block Gibbs (THRML)           1.275    322.3     2761.6
-antiferro_grid_30x30                Metropolis-Hastings           1.789    204.9        7.7
-antiferro_grid_30x30                Standard Gibbs                2.184    125.9        4.1
-antiferro_grid_30x30                Block Gibbs (THRML)           2.664    249.1     1748.7
-ferro_rrg_100                       Metropolis-Hastings           1.001    382.6      135.2
-ferro_rrg_100                       Standard Gibbs                1.001    378.4      116.7
-ferro_rrg_100                       Block Gibbs (THRML)           1.000    451.6     3159.2
-ferro_rrg_400                       Metropolis-Hastings           1.001    424.0       30.8
-ferro_rrg_400                       Standard Gibbs                1.000    421.7       34.3
-ferro_rrg_400                       Block Gibbs (THRML)           1.000    475.5     5313.0
-ferro_rrg_900                       Metropolis-Hastings           1.000    438.0       15.7
-ferro_rrg_900                       Standard Gibbs                1.002    414.1       13.4
-ferro_rrg_900                       Block Gibbs (THRML)           1.000    472.9     3786.9
-maxcut_100                          Metropolis-Hastings           1.022    113.3       34.5
-maxcut_100                          Standard Gibbs                1.041    110.0       21.2
-maxcut_100                          Block Gibbs (THRML)           1.017    137.2     1114.5
-maxcut_400                          Metropolis-Hastings           2.452     55.2        3.9
-maxcut_400                          Standard Gibbs                2.054     42.9        3.4
-maxcut_400                          Block Gibbs (THRML)           2.634     57.8      217.2
-maxcut_900                          Metropolis-Hastings           2.777     33.0        1.0
-maxcut_900                          Standard Gibbs                2.199     12.0        0.4
-maxcut_900                          Block Gibbs (THRML)           2.691     43.1       71.7
+Config                              Sampler                       R-hat      ESS      ESS/s  OutMem(MB)   MeanBest
+------------------------------------------------------------------------------------------------------------------
+ferro_grid_50x50                    Metropolis-Hastings           1.652     63.1        0.8      250.0   -4863.77
+ferro_grid_50x50                    Standard Gibbs                1.370     12.7        0.1      250.0   -4861.07
+ferro_grid_50x50                    Block Gibbs (THRML)           1.823     67.9      604.7      250.0   -4864.61
+ferro_grid_70x70                    Metropolis-Hastings           1.347     15.4        0.1      490.0   -9602.60
+ferro_grid_70x70                    Standard Gibbs                1.319      5.6        0.0      490.0   -9560.19
+ferro_grid_70x70                    Block Gibbs (THRML)           1.445     17.4      132.5      490.0   -9604.39
+ferro_grid_100x100                  Metropolis-Hastings           1.214      4.5        0.0     1000.0  -19652.63
+ferro_grid_100x100                  Standard Gibbs                1.182      4.1        0.0     1000.0  -19551.12
+ferro_grid_100x100                  Block Gibbs (THRML)           1.284      4.8       13.8     1000.0  -19664.47
+antiferro_grid_50x50                Metropolis-Hastings           1.656     53.8        0.6      250.0   -4865.51
+antiferro_grid_50x50                Standard Gibbs                1.369      9.1        0.1      250.0   -4859.65
+antiferro_grid_50x50                Block Gibbs (THRML)           1.797     73.2      683.3      250.0   -4869.00
+antiferro_grid_70x70                Metropolis-Hastings           1.428     12.5        0.1      490.0   -9596.49
+antiferro_grid_70x70                Standard Gibbs                1.311      4.9        0.0      490.0   -9564.01
+antiferro_grid_70x70                Block Gibbs (THRML)           1.391     14.2      108.6      490.0   -9595.89
+antiferro_grid_100x100              Metropolis-Hastings           1.259      4.1        0.0     1000.0  -19630.15
+antiferro_grid_100x100              Standard Gibbs                1.176      4.1        0.0     1000.0  -19557.77
+antiferro_grid_100x100              Block Gibbs (THRML)           1.280      4.6       13.7     1000.0  -19680.24
+ferro_grid_70x70_beta0.1            Metropolis-Hastings           1.000    478.2        2.9      490.0    -128.33
+ferro_grid_70x70_beta0.1            Standard Gibbs                1.000    477.1        2.8      490.0    -128.53
+ferro_grid_70x70_beta0.1            Block Gibbs (THRML)           1.000    468.9     3462.2      490.0    -129.15
+ferro_grid_70x70_beta0.5            Metropolis-Hastings           1.155     24.1        0.1      490.0   -4238.97
+ferro_grid_70x70_beta0.5            Standard Gibbs                1.130     15.4        0.1      490.0   -4212.35
+ferro_grid_70x70_beta0.5            Block Gibbs (THRML)           1.164     34.4      261.6      490.0   -4244.63
+ferro_grid_70x70_beta1.0            Metropolis-Hastings           1.410     13.7        0.1      490.0   -9593.27
+ferro_grid_70x70_beta1.0            Standard Gibbs                1.254      4.4        0.0      490.0   -9570.71
+ferro_grid_70x70_beta1.0            Block Gibbs (THRML)           1.407     15.7      118.9      490.0   -9603.25
+ferro_grid_70x70_beta2.0            Metropolis-Hastings           1.359      6.9        0.0      490.0  -19230.03
+ferro_grid_70x70_beta2.0            Standard Gibbs                1.291      4.5        0.0      490.0  -19156.93
+ferro_grid_70x70_beta2.0            Block Gibbs (THRML)           1.522      7.1       53.8      490.0  -19186.72
+ferro_rrg_900                       Metropolis-Hastings           1.000    427.9       13.9       90.0   -1350.00
+ferro_rrg_900                       Standard Gibbs                1.000    423.0       14.1       90.0   -1350.00
+ferro_rrg_900                       Block Gibbs (THRML)           1.000    466.0     4526.0       90.0   -1350.00
+ferro_rrg_1600                      Metropolis-Hastings           1.000    432.5        7.9      160.0   -2399.72
+ferro_rrg_1600                      Standard Gibbs                1.000    416.9        7.5      160.0   -2399.56
+ferro_rrg_1600                      Block Gibbs (THRML)           1.000    469.8     4468.9      160.0   -2399.96
+ferro_rrg_2500                      Metropolis-Hastings           1.001    423.8        5.0      250.0   -3743.12
+ferro_rrg_2500                      Standard Gibbs                1.000    426.2        4.9      250.0   -3743.73
+ferro_rrg_2500                      Block Gibbs (THRML)           1.000    474.0     3904.0      250.0   -3743.40
+maxcut_d3_900                       Metropolis-Hastings           1.028     54.2        1.9       90.0    1209.03
+maxcut_d3_900                       Standard Gibbs                1.030     52.9        1.7       90.0    1208.97
+maxcut_d3_900                       Block Gibbs (THRML)           1.016     85.8      897.8       90.0    1209.96
+maxcut_d3_1600                      Metropolis-Hastings           1.031     57.1        1.1      160.0    2136.93
+maxcut_d3_1600                      Standard Gibbs                1.037     50.1        0.9      160.0    2136.74
+maxcut_d3_1600                      Block Gibbs (THRML)           1.020     79.6      755.5      160.0    2137.35
+maxcut_d3_2500                      Metropolis-Hastings           1.022     61.0        0.7      250.0    3323.24
+maxcut_d3_2500                      Standard Gibbs                1.022     51.9        0.6      250.0    3322.77
+maxcut_d3_2500                      Block Gibbs (THRML)           1.015     88.6      726.4      250.0    3325.14
+maxcut_d5_900                       Metropolis-Hastings           1.055     61.6        1.9       90.0    1844.31
+maxcut_d5_900                       Standard Gibbs                1.060     56.0        1.8       90.0    1844.66
+maxcut_d5_900                       Block Gibbs (THRML)           1.049     91.2      671.3       90.0    1845.36
+maxcut_d5_1600                      Metropolis-Hastings           1.088     33.2        0.6      160.0    3280.70
+maxcut_d5_1600                      Standard Gibbs                1.088     31.9        0.6      160.0    3281.05
+maxcut_d5_1600                      Block Gibbs (THRML)           1.070     55.9      385.7      160.0    3282.53
+maxcut_d5_2500                      Metropolis-Hastings           1.063     23.9        0.3      250.0    5115.27
+maxcut_d5_2500                      Standard Gibbs                1.064     18.2        0.2      250.0    5114.41
+maxcut_d5_2500                      Block Gibbs (THRML)           1.078     38.3      228.7      250.0    5118.72

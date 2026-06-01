@@ -149,68 +149,6 @@ Four metrics are recorded for each configuration and sampler:
 
 \section{Results}\label{sec:results}
 
-Solution quality is assessed via the Mann-Whitney U test on the 50 per-chain best values (rank-biserial $r$; ns = not significant at $\alpha = 0.05$). Convergence is assessed via $\hat{R}$; values below 1.1 indicate convergence. Throughput is reported as effective samples per second (ESS/s). \textbf{All results are preliminary at current system sizes; larger configurations are ongoing and plots will be made more legible (not side by side / log scales)}
-
-\subsection{Random Regular Graph}
-
-Figure~\ref{fig:rrg_detail} shows the energy trace and distribution for the 900-node RRG. All three samplers achieve $\hat{R} \approx 1.0$ and produce identical overlapping distributions. Solution quality is statistically indistinguishable at all sizes ($p = 1.000$, $r = 0.000$ for all pairwise comparisons). At 900 nodes, THRML achieves 3787 ESS/s versus 15.7 for MH --- a 241× speedup --- while finding exactly equivalent solutions. Figure~\ref{fig:rrg_scaling} shows wall-clock time growing steeply for MH and Gibbs with system size, while THRML remains comparatively flat. Figure~\ref{fig:rrg_diagnostics} confirms $\hat{R} \approx 1.0$ and the ESS/s gap across all sizes.
-
-\begin{figure}[h!]
-  \centering
-  \includegraphics[width=\columnwidth]{../plots/detail__ferro_rrg_900.png}
-  \caption{Energy trace and distribution for the 900-node random regular graph. All three samplers converge to identical distributions; THRML achieves 241× higher ESS/s than MH.}
-  \label{fig:rrg_detail}
-\end{figure}
-
-\begin{figure}[h!]
-  \centering
-  \includegraphics[width=0.8\columnwidth]{../plots/scaling_rrg.png}
-  \caption{Wall-clock time versus system size for the random regular graph. THRML scales more favourably than MH and standard Gibbs.}
-  \label{fig:rrg_scaling}
-\end{figure}
-
-\begin{figure}[!h]
-  \centering
-  \includegraphics[width=\columnwidth]{../plots/diagnostics_rrg.png}
-  \caption{$\hat{R}$ (left) and ESS/s (right) for the random regular graph. All samplers converge ($\hat{R} \approx 1.0$); THRML dominates throughput at every size.}
-  \label{fig:rrg_diagnostics}
-\end{figure}
-
-\subsection{Grid}
-
-Figure~\ref{fig:grid_detail} shows the $30{\times}30$ ferromagnetic grid. At this size, MH ($\hat{R} = 2.29$) and Gibbs ($\hat{R} = 1.83$) fail to converge within the sample budget, while THRML ($\hat{R} = 2.87$) also struggles but accumulates 1847 ESS/s versus 5.5 for MH (336×). No sampler finds significantly better solutions ($p > 0.29$). The wide flat distributions for MH and Gibbs in Figure~\ref{fig:grid_detail} reflect chains at different energy levels, while THRML shows a more concentrated distribution consistent with faster mixing. At $20{\times}20$, THRML remains near-converged ($\hat{R} = 1.09$) while MH and Gibbs already diverge ($\hat{R} \approx 1.7$), with a 163× ESS/s advantage. At $10{\times}10$ all samplers converge and find equivalent solutions.
-
-The anti-ferromagnetic grid follows the same pattern. One notable result at $30{\times}30$: MH finds marginally better solutions than standard Gibbs ($p = 0.022$, $r = -0.19$), the only case where the rejection step provides a measurable quality advantage.
-
-\begin{figure}[h!]
-  \centering
-  \includegraphics[width=\columnwidth]{../plots/detail__ferro_grid_30x30.png}
-  \caption{Energy trace and distribution for the $30{\times}30$ ferromagnetic grid (900 nodes). MH and Gibbs show wide flat distributions indicating poor mixing; THRML is more concentrated despite also having $\hat{R} > 1.1$.}
-  \label{fig:grid_detail}
-\end{figure}
-
-\subsection{MaxCut}
-
-At 900 nodes, no sampler converges ($\hat{R}$: MH 2.78, Gibbs 2.20, THRML 2.69). Despite this, solution quality is statistically equivalent across all comparisons ($p > 0.19$, $r \leq 0.15$). THRML achieves 71.7 ESS/s versus 1.0 for MH and 0.4 for standard Gibbs --- a 72× and 179× speedup respectively while finding indistinguishable cut values. At 100 nodes all samplers converge and find equivalent solutions, with THRML achieving 1115 ESS/s (32× over MH). Figure~\ref{fig:maxcut_diagnostics} shows $\hat{R}$ and ESS/s across sizes.
-
-\begin{figure}[h!]
-  \centering
-  \includegraphics[width=\columnwidth]{../plots/diagnostics_maxcut.png}
-  \caption{$\hat{R}$ (left) and ESS/s (right) for MaxCut. All samplers fail to converge at 400 and 900 nodes; THRML maintains a large throughput advantage throughout.}
-  \label{fig:maxcut_diagnostics}
-\end{figure}
-
-\subsection{Temperature Sweep}
-
-THRML finds statistically equivalent solutions to MH at all four temperatures ($p > 0.15$ in every case), confirming the throughput advantage is not specific to a single operating point. Figure~\ref{fig:temp_sweep} shows solution quality and wall time across temperatures. \textbf{[Preliminary: 10×10 grid; to be rerun at larger size.]}
-
-\begin{figure}[h!]
-  \centering
-  \includegraphics[width=\columnwidth]{../plots/temperature_sweep.png}
-  \caption{Solution quality and wall-clock time versus inverse temperature $\beta$ on the $10{\times}10$ ferromagnetic grid.}
-  \label{fig:temp_sweep}
-\end{figure}
-
 \section{Discussion}\label{sec:discussion}
 
 \section{Conclusion}\label{sec:conclusion}

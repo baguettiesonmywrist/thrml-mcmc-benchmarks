@@ -16,25 +16,40 @@ LABELS = {"mh": "Metropolis-Hastings", "gibbs": "Standard Gibbs", "thrml": "Bloc
 # --- loading ---
 
 def load_result(config_name: str, sampler: str) -> dict | None:
-    path = os.path.join(RESULTS_DIR, f"{config_name}__{sampler}.npz")
-    if not os.path.exists(path):
+    """Load and pool results across all runs. Returns None if no runs exist."""
+    runs = []
+    for run_idx in range(3):
+        path = os.path.join(RESULTS_DIR, f"{config_name}__{sampler}__run{run_idx}.npz")
+        if os.path.exists(path):
+            runs.append(np.load(path))
+    if not runs:
         return None
-    data = np.load(path)
     return {
-        "energy_trajectory": data["energy_trajectory"],  # [n_chains, n_samples]
-        "best_energy": data["best_energy"],               # [n_chains]
-        "wall_time": float(data["wall_time"]),
-        "output_memory_bytes": float(data["output_memory_bytes"]) if "output_memory_bytes" in data.files else -1.0,
+        # pool chains across runs for richer statistics
+        "energy_trajectory": np.concatenate([r["energy_trajectory"] for r in runs], axis=0),
+        "best_energy": np.concatenate([r["best_energy"] for r in runs], axis=0),
+        # average wall time across runs for a stable estimate
+        "wall_time": float(np.mean([r["wall_time"] for r in runs])),
+        "output_memory_bytes": float(runs[0]["output_memory_bytes"]) if "output_memory_bytes" in runs[0].files else -1.0,
     }
 
 
 def load_all_results() -> dict:
     results = defaultdict(dict)
+    seen = set()
     for fname in os.listdir(RESULTS_DIR):
         if not fname.endswith(".npz"):
             continue
-        config_name, sampler = fname[:-4].rsplit("__", 1)
-        if sampler in SAMPLERS:
+        # filename format: config__sampler__runN.npz
+        parts = fname[:-4].rsplit("__", 2)
+        if len(parts) != 3 or not parts[2].startswith("run"):
+            continue
+        config_name, sampler = parts[0], parts[1]
+        if sampler not in SAMPLERS:
+            continue
+        key = (config_name, sampler)
+        if key not in seen:
+            seen.add(key)
             results[config_name][sampler] = load_result(config_name, sampler)
     return dict(results)
 
@@ -142,11 +157,12 @@ def plot_time_comparison(results: dict, config_names: list[str], title: str, fna
     width = 0.25
     fig, ax = plt.subplots(figsize=(max(6, len(config_names) * 1.8), 4))
     for i, sampler in enumerate(SAMPLERS):
-        times = [results.get(c, {}).get(sampler, {}).get("wall_time", 0) for c in config_names]
+        times = [results.get(c, {}).get(sampler, {}).get("wall_time", np.nan) for c in config_names]
         ax.bar(x + i * width, times, width, label=LABELS[sampler], color=COLORS[sampler])
     ax.set_xticks(x + width)
     ax.set_xticklabels(config_names, rotation=30, ha="right", fontsize=8)
-    ax.set_ylabel("Wall-clock time (s)")
+    ax.set_yscale("log")
+    ax.set_ylabel("Wall-clock time (s)  [log scale]")
     ax.set_title(title)
     ax.legend()
     fig.tight_layout()
@@ -159,7 +175,8 @@ def plot_scaling(results: dict, config_names: list[str], sizes: list[int], title
         times = [results.get(c, {}).get(sampler, {}).get("wall_time", np.nan) for c in config_names]
         ax.plot(sizes, times, marker="o", color=COLORS[sampler], label=LABELS[sampler])
     ax.set_xlabel("Number of nodes")
-    ax.set_ylabel("Wall-clock time (s)")
+    ax.set_yscale("log")
+    ax.set_ylabel("Wall-clock time (s)  [log scale]")
     ax.set_title(title)
     ax.legend()
     fig.tight_layout()
@@ -186,7 +203,7 @@ def plot_quality_comparison(results: dict, config_names: list[str], title: str,
 
 def plot_temperature_sweep(results: dict) -> None:
     betas = [0.1, 0.5, 1.0, 2.0]
-    config_names = [f"ferro_grid_60x60_beta{b}" for b in betas]
+    config_names = [f"ferro_grid_70x70_beta{b}" for b in betas]
     fig, axes = plt.subplots(1, 2, figsize=(12, 4))
     for ax, metric, ylabel in zip(
         axes,
@@ -244,7 +261,8 @@ def plot_diagnostics(results: dict, config_names: list[str], title: str, fname: 
     axes[0].set_xticklabels(config_names, rotation=30, ha="right", fontsize=8)
     axes[0].legend(fontsize=7)
 
-    axes[1].set_ylabel("ESS / second  (higher = better)")
+    axes[1].set_yscale("log")
+    axes[1].set_ylabel("ESS / second  [log scale]  (higher = better)")
     axes[1].set_title("Effective samples per second")
     axes[1].set_xticks(x + width)
     axes[1].set_xticklabels(config_names, rotation=30, ha="right", fontsize=8)
@@ -256,11 +274,12 @@ def plot_diagnostics(results: dict, config_names: list[str], title: str, fname: 
 
 
 def print_diagnostics_table(results: dict, config_names: list[str]) -> None:
-    """Print R-hat, ESS, ESS/s, and peak memory for all configs and samplers."""
-    header = f"{'Config':<35} {'Sampler':<28} {'R-hat':>6} {'ESS':>8} {'ESS/s':>10} {'OutMem(MB)':>11}"
-    print("\n" + header)
-    print("-" * len(header))
+    """Save R-hat, ESS, ESS/s, output memory, and mean best energy/cut to results_summary.txt."""
+    header = (f"{'Config':<35} {'Sampler':<28} {'R-hat':>6} {'ESS':>8} {'ESS/s':>10}"
+              f" {'OutMem(MB)':>11} {'MeanBest':>10}")
+    lines = [header, "-" * len(header)]
     for c in config_names:
+        is_maxcut = c.startswith("maxcut_d")
         for sampler in SAMPLERS:
             data = results.get(c, {}).get(sampler)
             if data is None:
@@ -268,8 +287,14 @@ def print_diagnostics_table(results: dict, config_names: list[str]) -> None:
             d = compute_diagnostics(data)
             mem = data.get("output_memory_bytes", -1.0)
             mem_str = f"{mem/1e6:>11.1f}" if mem >= 0 else f"{'N/A':>11}"
-            print(f"{c:<35} {LABELS[sampler]:<28} {d['r_hat']:>6.3f} {d['ess']:>8.1f} {d['ess_per_sec']:>10.1f}{mem_str}")
-    print()
+            mean_best = data["best_energy"].mean()
+            lines.append(f"{c:<35} {LABELS[sampler]:<28} {d['r_hat']:>6.3f} {d['ess']:>8.1f}"
+                         f" {d['ess_per_sec']:>10.1f}{mem_str} {mean_best:>10.2f}")
+    lines.append("")
+    output = "\n".join(lines)
+    with open("results_summary.txt", "w") as f:
+        f.write(output)
+    print("saved → results_summary.txt")
 
 
 # --- main ---
@@ -280,21 +305,21 @@ if __name__ == "__main__":
 
     # --- convergence plots (key configs only) ---
     key_configs = [
-        "ferro_grid_60x60", "ferro_grid_100x100",
-        "antiferro_grid_60x60", "antiferro_grid_100x100",
-        "ferro_rrg_900", "ferro_rrg_2500",
-        "maxcut_d3_900", "maxcut_d3_2500",
-        "maxcut_d5_900", "maxcut_d5_2500",
+        "ferro_grid_70x70", "ferro_grid_100x100",
+        "antiferro_grid_70x70", "antiferro_grid_100x100",
+        "ferro_rrg_1600", "ferro_rrg_2500",
+        "maxcut_d3_1600", "maxcut_d3_2500",
+        "maxcut_d5_1600", "maxcut_d5_2500",
     ]
     for c in key_configs:
         if c in results:
             plot_convergence(results, c)
 
     # --- scaling ---
-    grid_sides = [30, 60, 100]
+    grid_sides = [50, 70, 100]
     grid_nodes = [s * s for s in grid_sides]
-    rrg_nodes = [400, 900, 2500]
-    maxcut_nodes = [400, 900, 2500]
+    rrg_nodes = [900, 1600, 2500]
+    maxcut_nodes = [900, 1600, 2500]
 
     plot_scaling(results, [f"ferro_grid_{s}x{s}" for s in grid_sides],
                  grid_nodes, title="Grid ferro — scaling", fname="scaling_grid_ferro")
@@ -366,7 +391,8 @@ if __name__ == "__main__":
                      title="Diagnostics — MaxCut degree-5", fname="diagnostics_maxcut_d5")
 
     # --- print diagnostics table ---
-    all_configs = grid_configs + antiferro_configs + rrg_configs + maxcut_configs
+    sweep_configs = [f"ferro_grid_70x70_beta{b}" for b in [0.1, 0.5, 1.0, 2.0]]
+    all_configs = grid_configs + antiferro_configs + sweep_configs + rrg_configs + maxcut_configs
     print_diagnostics_table(results, all_configs)
 
     print("All plots saved.")

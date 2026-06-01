@@ -7,22 +7,28 @@ SAMPLERS = ["mh", "gibbs", "thrml"]
 LABELS = {"mh": "MH", "gibbs": "Gibbs", "thrml": "THRML"}
 
 GROUPS = [
-    ("Grid ferro",      ["ferro_grid_10x10", "ferro_grid_20x20", "ferro_grid_30x30"]),
-    ("Grid antiferro",  ["antiferro_grid_10x10", "antiferro_grid_20x20", "antiferro_grid_30x30"]),
-    ("Temp sweep",      ["ferro_grid_10x10_beta0.1", "ferro_grid_10x10_beta0.5",
-                         "ferro_grid_10x10_beta1.0", "ferro_grid_10x10_beta2.0"]),
-    ("RRG",             ["ferro_rrg_100", "ferro_rrg_400", "ferro_rrg_900"]),
-    ("MaxCut",          ["maxcut_100", "maxcut_400", "maxcut_900"]),
+    ("Grid ferro",      ["ferro_grid_50x50", "ferro_grid_70x70", "ferro_grid_100x100"]),
+    ("Grid antiferro",  ["antiferro_grid_50x50", "antiferro_grid_70x70", "antiferro_grid_100x100"]),
+    ("Temp sweep",      ["ferro_grid_70x70_beta0.1", "ferro_grid_70x70_beta0.5",
+                         "ferro_grid_70x70_beta1.0", "ferro_grid_70x70_beta2.0"]),
+    ("RRG",             ["ferro_rrg_900", "ferro_rrg_1600", "ferro_rrg_2500"]),
+    ("MaxCut d3",       ["maxcut_d3_900", "maxcut_d3_1600", "maxcut_d3_2500"]),
+    ("MaxCut d5",       ["maxcut_d5_900", "maxcut_d5_1600", "maxcut_d5_2500"]),
 ]
 
 COMPARISONS = [("thrml", "mh"), ("thrml", "gibbs"), ("mh", "gibbs")]
 
 
 def load_best(config: str, sampler: str) -> np.ndarray | None:
-    path = os.path.join(RESULTS_DIR, f"{config}__{sampler}.npz")
-    if not os.path.exists(path):
+    """Load and pool best_energy across all runs."""
+    runs = []
+    for run_idx in range(3):
+        path = os.path.join(RESULTS_DIR, f"{config}__{sampler}__run{run_idx}.npz")
+        if os.path.exists(path):
+            runs.append(np.load(path)["best_energy"])
+    if not runs:
         return None
-    return np.load(path)["best_energy"]  # [n_chains]
+    return np.concatenate(runs)  # [n_chains * n_runs]
 
 
 def rank_biserial(u: float, n1: int, n2: int) -> float:
@@ -51,7 +57,7 @@ def run_tests() -> None:
         lines.append("-" * len(col))
 
         for config in configs:
-            is_maxcut = config.startswith("maxcut")
+            is_maxcut = config.startswith("maxcut_d")
             data = {s: load_best(config, s) for s in SAMPLERS}
 
             for s1, s2 in COMPARISONS:

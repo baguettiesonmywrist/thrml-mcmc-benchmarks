@@ -14,7 +14,8 @@ LABELS = {"mh": "Metropolis-Hastings", "gibbs": "Standard Gibbs", "thrml": "Bloc
 
 
 def _load(config_name: str, sampler: str) -> dict | None:
-    path = os.path.join(RESULTS_DIR, f"{config_name}__{sampler}.npz")
+    """Load run 0 for visualisation."""
+    path = os.path.join(RESULTS_DIR, f"{config_name}__{sampler}__run0.npz")
     if not os.path.exists(path):
         return None
     d = np.load(path)
@@ -121,10 +122,14 @@ def plot_detail(config_name: str) -> None:
 if __name__ == "__main__":
     config_names = set()
     for fname in os.listdir(RESULTS_DIR):
-        if fname.endswith(".npz") and "__" in fname:
-            name = fname[:-4].rsplit("__", 1)[0]
-            if "smoke_test" not in name:
-                config_names.add(name)
+        if not fname.endswith(".npz"):
+            continue
+        parts = fname[:-4].rsplit("__", 2)
+        if len(parts) != 3 or not parts[2].startswith("run"):
+            continue
+        config_name = parts[0]
+        if "smoke_test" not in config_name:
+            config_names.add(config_name)
 
     print(f"Generating detail plots for {len(config_names)} configs...")
     for config_name in sorted(config_names):

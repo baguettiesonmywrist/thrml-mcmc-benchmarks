@@ -105,9 +105,12 @@ def _run_sampler(
     )
 
 
-def save_result(result: BenchmarkResult) -> None:
+N_RUNS = 3
+
+
+def save_result(result: BenchmarkResult, run_idx: int) -> None:
     os.makedirs(RESULTS_DIR, exist_ok=True)
-    path = os.path.join(RESULTS_DIR, f"{result.config_name}__{result.sampler}.npz")
+    path = os.path.join(RESULTS_DIR, f"{result.config_name}__{result.sampler}__run{run_idx}.npz")
     np.savez(
         path,
         energy_trajectory=result.energy_trajectory,
@@ -120,10 +123,12 @@ def save_result(result: BenchmarkResult) -> None:
 
 def run_benchmark(key: jax.Array, config: BenchmarkConfig) -> None:
     print(f"\n=== {config.name} ===")
-    for sampler_name, run_fn in [("mh", run_mh), ("gibbs", run_gibbs), ("thrml", run_thrml)]:
-        key, subkey = jax.random.split(key)
-        result = _run_sampler(subkey, config, run_fn, sampler_name)
-        save_result(result)
+    for run_idx in range(N_RUNS):
+        print(f"  --- run {run_idx + 1}/{N_RUNS} ---")
+        for sampler_name, run_fn in [("mh", run_mh), ("gibbs", run_gibbs), ("thrml", run_thrml)]:
+            key, subkey = jax.random.split(key)
+            result = _run_sampler(subkey, config, run_fn, sampler_name)
+            save_result(result, run_idx)
 
 
 # --- experiment configs ---
@@ -133,8 +138,8 @@ def make_configs() -> list[BenchmarkConfig]:
 
     sampling_kwargs = dict(n_chains=50, n_warmup=200, n_samples=500, steps_per_sample=5)
 
-    # sweep over system sizes: 900, 3600, 10000 nodes
-    for side in [30, 60, 100]:
+    # sweep over system sizes: 2500, 4900, 10000 nodes
+    for side in [50, 70, 100]:
         configs.append(BenchmarkConfig(
             name=f"ferro_grid_{side}x{side}",
             model=make_grid_model(side=side, J=1.0, beta=1.0),
@@ -151,14 +156,14 @@ def make_configs() -> list[BenchmarkConfig]:
     # sweep over temperatures on a mid-size grid
     for beta in [0.1, 0.5, 1.0, 2.0]:
         configs.append(BenchmarkConfig(
-            name=f"ferro_grid_60x60_beta{beta}",
-            model=make_grid_model(side=60, J=1.0, beta=beta),
+            name=f"ferro_grid_70x70_beta{beta}",
+            model=make_grid_model(side=70, J=1.0, beta=beta),
             problem="ferro",
             **sampling_kwargs,
         ))
 
     # random regular graph
-    for n_nodes in [400, 900, 2500]:
+    for n_nodes in [900, 1600, 2500]:
         configs.append(BenchmarkConfig(
             name=f"ferro_rrg_{n_nodes}",
             model=make_random_regular_model(n_nodes=n_nodes, degree=3, J=1.0, beta=1.0),
@@ -168,7 +173,7 @@ def make_configs() -> list[BenchmarkConfig]:
 
     # maxcut on random regular graph — degree sweep at same sizes as RRG
     for degree in [3, 5]:
-        for n_nodes in [400, 900, 2500]:
+        for n_nodes in [900, 1600, 2500]:
             configs.append(BenchmarkConfig(
                 name=f"maxcut_d{degree}_{n_nodes}",
                 model=make_maxcut_rrg_model(n_nodes=n_nodes, degree=degree, beta=1.0),
