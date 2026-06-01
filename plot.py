@@ -22,6 +22,7 @@ def _load(config_name: str, sampler: str) -> dict | None:
         "energy_trajectory": d["energy_trajectory"],  # [n_chains, n_samples]
         "best_energy": d["best_energy"],               # [n_chains]
         "wall_time": float(d["wall_time"]),
+        "peak_memory_bytes": float(d["active_memory_bytes"]) if "active_memory_bytes" in d.files else -1.0,
     }
 
 
@@ -103,8 +104,10 @@ def plot_detail(config_name: str) -> None:
         best_e = d["best_energy"].max() if is_maxcut else d["best_energy"].min()
         best_label = "max cut" if is_maxcut else "min E  "
         t = d["wall_time"]
+        mem = d.get("peak_memory_bytes", -1.0)
+        mem_str = f"  mem = {mem/1e6:.0f}MB" if mem >= 0 else ""
         summary_lines.append(
-            f"{LABELS[sampler]:<28}  mean = {mean_e:9.2f}  {best_label} = {best_e:9.2f}  time = {t:.3f}s"
+            f"{LABELS[sampler]:<28}  mean = {mean_e:9.2f}  {best_label} = {best_e:9.2f}  time = {t:.3f}s{mem_str}"
         )
 
     fig.text(0.5, 0.01, "\n".join(summary_lines), ha="center", va="bottom",

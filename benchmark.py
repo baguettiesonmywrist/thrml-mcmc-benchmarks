@@ -40,6 +40,16 @@ class BenchmarkResult:
     energy_trajectory: np.ndarray  # [n_chains, n_samples] energy at each sample
     best_energy: np.ndarray        # [n_chains] minimum energy found per chain
     wall_time: float               # seconds, excludes jit compilation
+    active_memory_bytes: float     # live GPU bytes right after sampling completes; -1 if unavailable
+
+
+def _active_memory_bytes() -> float:
+    """Currently allocated GPU bytes; -1 if unavailable."""
+    try:
+        stats = jax.devices()[0].memory_stats()
+        return float(stats.get("bytes_in_use", -1))
+    except Exception:
+        return -1.0
 
 
 def _run_sampler(
@@ -73,6 +83,7 @@ def _run_sampler(
     t0 = time.perf_counter()
     samples = jax.block_until_ready(batched(keys, init_spins))
     wall_time = time.perf_counter() - t0
+    active_memory = _active_memory_bytes()  # captured before numpy conversion while samples still on GPU
 
     # samples: [n_chains, n_samples, n_nodes]
     # compute energy or cut value one chain at a time to avoid OOM on dense graphs
@@ -89,7 +100,8 @@ def _run_sampler(
     # for Ising lower is better (energy), for MaxCut higher is better (cut value)
     best = trajectory.max(axis=1) if config.problem == "maxcut" else trajectory.min(axis=1)
 
-    print(f"  [{sampler_name}] done in {wall_time:.2f}s  mean_best={best.mean():.2f}", flush=True)
+    mem_str = f"  active_mem={active_memory/1e6:.1f}MB" if active_memory >= 0 else ""
+    print(f"  [{sampler_name}] done in {wall_time:.2f}s  mean_best={best.mean():.2f}{mem_str}", flush=True)
 
     return BenchmarkResult(
         config_name=config.name,
@@ -97,6 +109,7 @@ def _run_sampler(
         energy_trajectory=trajectory,
         best_energy=best,
         wall_time=wall_time,
+        active_memory_bytes=active_memory,
     )
 
 
@@ -108,6 +121,7 @@ def save_result(result: BenchmarkResult) -> None:
         energy_trajectory=result.energy_trajectory,
         best_energy=result.best_energy,
         wall_time=np.array(result.wall_time),
+        active_memory_bytes=np.array(result.active_memory_bytes),
     )
     print(f"  saved → {path}")
 

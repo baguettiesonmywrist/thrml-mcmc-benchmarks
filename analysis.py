@@ -24,6 +24,7 @@ def load_result(config_name: str, sampler: str) -> dict | None:
         "energy_trajectory": data["energy_trajectory"],  # [n_chains, n_samples]
         "best_energy": data["best_energy"],               # [n_chains]
         "wall_time": float(data["wall_time"]),
+        "peak_memory_bytes": float(data["active_memory_bytes"]) if "active_memory_bytes" in data.files else -1.0,
     }
 
 
@@ -115,6 +116,25 @@ def plot_convergence(results: dict, config_name: str) -> None:
     ax.legend()
     fig.tight_layout()
     _save(fig, f"convergence__{config_name}")
+
+
+def plot_memory_comparison(results: dict, config_names: list[str], title: str, fname: str) -> None:
+    x = np.arange(len(config_names))
+    width = 0.25
+    fig, ax = plt.subplots(figsize=(max(6, len(config_names) * 1.8), 4))
+    for i, sampler in enumerate(SAMPLERS):
+        mems = []
+        for c in config_names:
+            v = (results.get(c, {}).get(sampler) or {}).get("peak_memory_bytes", -1.0)
+            mems.append(v / 1e6 if v >= 0 else 0.0)
+        ax.bar(x + i * width, mems, width, label=LABELS[sampler], color=COLORS[sampler])
+    ax.set_xticks(x + width)
+    ax.set_xticklabels(config_names, rotation=30, ha="right", fontsize=8)
+    ax.set_ylabel("Active GPU memory (MB)")
+    ax.set_title(title)
+    ax.legend()
+    fig.tight_layout()
+    _save(fig, fname)
 
 
 def plot_time_comparison(results: dict, config_names: list[str], title: str, fname: str) -> None:
@@ -236,8 +256,8 @@ def plot_diagnostics(results: dict, config_names: list[str], title: str, fname: 
 
 
 def print_diagnostics_table(results: dict, config_names: list[str]) -> None:
-    """Print R-hat, ESS, and ESS/s for all configs and samplers."""
-    header = f"{'Config':<35} {'Sampler':<28} {'R-hat':>6} {'ESS':>8} {'ESS/s':>10}"
+    """Print R-hat, ESS, ESS/s, and peak memory for all configs and samplers."""
+    header = f"{'Config':<35} {'Sampler':<28} {'R-hat':>6} {'ESS':>8} {'ESS/s':>10} {'ActiveMem(MB)':>14}"
     print("\n" + header)
     print("-" * len(header))
     for c in config_names:
@@ -246,7 +266,9 @@ def print_diagnostics_table(results: dict, config_names: list[str]) -> None:
             if data is None:
                 continue
             d = compute_diagnostics(data)
-            print(f"{c:<35} {LABELS[sampler]:<28} {d['r_hat']:>6.3f} {d['ess']:>8.1f} {d['ess_per_sec']:>10.1f}")
+            mem = data.get("peak_memory_bytes", -1.0)
+            mem_str = f"{mem/1e6:>14.1f}" if mem >= 0 else f"{'N/A':>14}"
+            print(f"{c:<35} {LABELS[sampler]:<28} {d['r_hat']:>6.3f} {d['ess']:>8.1f} {d['ess_per_sec']:>10.1f}{mem_str}")
     print()
 
 
@@ -286,6 +308,16 @@ if __name__ == "__main__":
                          title="Wall-clock time — random regular graph", fname="time_rrg")
     plot_time_comparison(results, [f"maxcut_{n}" for n in [100, 400, 900]],
                          title="Wall-clock time — MaxCut", fname="time_maxcut")
+
+    # --- memory comparisons ---
+    plot_memory_comparison(results, [f"ferro_grid_{s}x{s}" for s in [10, 20, 30]],
+                           title="Peak GPU memory — grid ferro", fname="memory_grid_ferro")
+    plot_memory_comparison(results, [f"antiferro_grid_{s}x{s}" for s in [10, 20, 30]],
+                           title="Peak GPU memory — grid antiferro", fname="memory_grid_antiferro")
+    plot_memory_comparison(results, [f"ferro_rrg_{n}" for n in [100, 400, 900]],
+                           title="Peak GPU memory — random regular graph", fname="memory_rrg")
+    plot_memory_comparison(results, [f"maxcut_{n}" for n in [100, 400, 900]],
+                           title="Peak GPU memory — MaxCut", fname="memory_maxcut")
 
     # --- quality comparisons ---
     plot_quality_comparison(results, [f"ferro_grid_{s}x{s}" for s in [10, 20, 30]],
