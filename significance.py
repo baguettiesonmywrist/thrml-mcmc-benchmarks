@@ -18,7 +18,6 @@ GROUPS = [
 
 COMPARISONS = [("thrml", "mh"), ("thrml", "gibbs"), ("mh", "gibbs")]
 
-
 def load_best(config: str, sampler: str) -> np.ndarray | None:
     """Load and pool best_energy across all runs."""
     runs = []
@@ -30,11 +29,9 @@ def load_best(config: str, sampler: str) -> np.ndarray | None:
         return None
     return np.concatenate(runs)  # [n_chains * n_runs]
 
-
 def rank_biserial(u: float, n1: int, n2: int) -> float:
     """Effect size r in [-1, 1]. 0 = no effect, ±1 = complete separation."""
     return 2 * u / (n1 * n2) - 1
-
 
 def sig_label(p: float) -> str:
     if p < 0.001: return "***"
@@ -42,14 +39,12 @@ def sig_label(p: float) -> str:
     if p < 0.05:  return "*  "
     return "ns "
 
-
 OUTPUT_FILE = "significance.txt"
-
 
 def run_tests() -> None:
     lines = []
 
-    col = f"{'Config':<35} {'Comparison':<16} {'p-value':>8}  {'r':>6}  {'sig'}"
+    col = f"{'Config':<35} {'Comparison':<16} {'val1':>10}  {'val2':>10}  {'p-value':>8}  {'r':>6}  {'sig'}"
     lines.append(col)
 
     for group_name, configs in GROUPS:
@@ -68,18 +63,22 @@ def run_tests() -> None:
                 u, p = stats.mannwhitneyu(a, b, alternative="two-sided")
                 r = rank_biserial(u, len(a), len(b))
 
+                mean1, mean2 = a.mean(), b.mean()
+                val_str = f"{mean1:>10.2f}  {mean2:>10.2f}"
+
                 if p < 0.05:
                     better = s1 if (r > 0) == is_maxcut else s2
-                    note = f"← {LABELS[better]} better"
+                    note = f"<- {LABELS[better]} better"
                 else:
                     note = ""
 
                 lines.append(
                     f"{config:<35} {LABELS[s1]+' vs '+LABELS[s2]:<16} "
-                    f"{p:>8.4f}  {r:>6.3f}  {sig_label(p)}  {note}"
+                    f"{val_str}  {p:>8.4f}  {r:>6.3f}  {sig_label(p)}  {note}"
                 )
 
-    lines.append("\nSignificance: *** p<0.001  ** p<0.01  * p<0.05  ns = not significant")
+    lines.append("\nval1/val2 = mean best energy (Ising, lower is better) or mean best cut (MaxCut, higher is better)")
+    lines.append("Significance: *** p<0.001  ** p<0.01  * p<0.05  ns = not significant")
     lines.append("r = rank-biserial effect size (0 = no difference, ±1 = complete separation)")
     lines.append("ns = samplers are statistically equivalent in solution quality\n")
 
@@ -87,8 +86,7 @@ def run_tests() -> None:
     print(output)
     with open(OUTPUT_FILE, "w") as f:
         f.write(output)
-    print(f"saved → {OUTPUT_FILE}")
-
+    print(f"saved -> {OUTPUT_FILE}")
 
 if __name__ == "__main__":
     run_tests()
