@@ -99,7 +99,7 @@ where $\sigma$ is the sigmoid function. One sweep consists of $n$ single-node co
 
 Block Gibbs extends single-site Gibbs by updating entire groups of conditionally independent nodes in parallel. Two nodes are conditionally independent given all others if and only if they share no edge, so the natural grouping is a proper graph colouring: nodes of the same colour can be sampled simultaneously without violating the Markov property.
 
-The graph is coloured using the DSATUR greedy algorithm, producing colour classes $\mathcal{C}_1, \ldots, \mathcal{C}_k$. One block Gibbs step cycles through all classes in order; within each class, all spins are sampled in parallel from their conditionals \eqref{eq:gibbs_cond}. A 2D square grid is bipartite and requires two colours; a degree-3 random regular graph typically requires three or four. More colours mean smaller parallel blocks but the same total work per step.
+The graph is coloured using the DSATUR greedy algorithm \cite{brelaz1979}, producing colour classes $\mathcal{C}_1, \ldots, \mathcal{C}_k$. One block Gibbs step cycles through all classes in order; within each class, all spins are sampled in parallel from their conditionals \eqref{eq:gibbs_cond}. A 2D square grid is bipartite and requires two colours; a degree-3 random regular graph typically requires three or four. More colours mean smaller parallel blocks but the same total work per step.
 
 This sampler is implemented using the THRML library \cite{thrml}, which provides an \texttt{IsingEBM} energy model, an \texttt{IsingSamplingProgram} encoding the colour-block structure, and a \texttt{sample\_states} function that executes the schedule. The same \texttt{jax.vmap} parallelism over independent chains is applied externally.
 
@@ -146,7 +146,7 @@ Four metrics are recorded for each configuration and sampler:
 
   \item \textbf{Convergence}: the Gelman-Rubin $\hat{R}$ statistic \cite{gelman1992} computed on the energy trajectory across all 50 chains. Values $\hat{R} < 1.1$ indicate convergence; values substantially above 1.1 indicate chains have not mixed.
 
-  \item \textbf{Sampling efficiency}: the effective sample size (ESS) per chain, estimated via integrated autocorrelation time using the FFT, and ESS per second as the primary throughput metric.
+  \item \textbf{Sampling efficiency}: the effective sample size (ESS) per chain, estimated via integrated autocorrelation time using the FFT \cite{geyer1992}, and ESS per second as the primary throughput metric.
 
   \item \textbf{Wall-clock time}: total wall time for the timed run, excluding JIT compilation.
 \end{itemize}
@@ -334,6 +334,10 @@ This thesis presented a systematic three-way comparison of THRML block Gibbs, st
   \bibitem{goemans1995} M. X. Goemans and D. P. Williamson, ``Improved approximation algorithms for maximum cut and satisfiability problems using semidefinite programming,'' \textit{J. ACM}, vol. 42, no. 6, pp. 1115--1145, 1995.
 
   \bibitem{gelman1992} A. Gelman and D. B. Rubin, ``Inference from iterative simulation using multiple sequences,'' \textit{Statist. Sci.}, vol. 7, no. 4, pp. 457--472, 1992.
+
+  \bibitem{brelaz1979} D. Brélaz, ``New methods to color the vertices of a graph,'' \textit{Commun. ACM}, vol. 22, no. 4, pp. 251--256, 1979. doi: 10.1145/359094.359101.
+
+  \bibitem{geyer1992} C. J. Geyer, ``Practical Markov chain Monte Carlo,'' \textit{Statist. Sci.}, vol. 7, no. 4, pp. 473--511, 1992. doi: 10.1214/ss/1177011137.
 
 \end{thebibliography}
 
