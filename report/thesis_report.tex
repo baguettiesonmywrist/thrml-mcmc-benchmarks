@@ -1,0 +1,246 @@
+\documentclass[conference]{IEEEtran}
+\IEEEoverridecommandlockouts
+% The preceding line is only needed to identify funding in the first footnote. If that is unneeded, please comment it out.
+\usepackage{cite}
+\usepackage{amsmath,amssymb,amsfonts}
+\usepackage{algorithmic}
+\usepackage{algorithm}
+\usepackage{graphicx}
+\usepackage{textcomp}
+\usepackage{xcolor}
+\usepackage{url}
+\def\BibTeX{{\rm B\kern-.05em{\sc i\kern-.025em b}\kern-.08em
+T\kern-.1667em\lower.7ex\hbox{E}\kern-.125emX}}
+\begin{document}
+
+\title{Comparing Novel Thermodynamic Computing with Traditional Graphics Processing Unit Implementations for Ground State Energy Estimation in Classical Optimization Problems\\
+  \thanks{This thesis was prepared in partial fulfilment of the requirements for the Degree of Bachelor of Computer Science, Maastricht University. Supervisors: Georgios Stamoulis and Charis Kouzinopoulis.}
+}
+
+\author{\IEEEauthorblockN{Noah Kestenholz}
+  \IEEEauthorblockA{\textit{Department of Advanced Computing Sciences} \\
+    \textit{Faculty of Science and Engineering}\\
+    \textit{Maastricht University}\\
+  Maastricht, The Netherlands}
+}
+
+\maketitle
+
+\begin{abstract}
+  To be filled in.
+\end{abstract}
+
+\begin{IEEEkeywords}
+  thermodynamic computing, THRML, Ising model, MaxCut, Gibbs sampling, Block Gibbs, Metropolis-Hastings, probabilistic computing, energy-based models, EBMs
+\end{IEEEkeywords}
+
+\section{Introduction}\label{sec:introduction}
+
+Solving hard combinatorial optimisation problems is central to applications spanning logistics, drug discovery, and machine learning, yet the energy cost of running these workloads on conventional hardware continues to grow. Thermodynamic computing has emerged as a promising alternative paradigm: rather than suppressing thermal noise, it harnesses it as a computational resource \cite{jelincic2025, melanson2025}.
+
+The Ising model is the canonical test bed for combinatorial solvers. It assigns a binary spin $s_i \in \{-1, +1\}$ to each node of a graph, with an energy function whose minimisation is NP-hard in general. Any NP problem can be mapped to an Ising instance with only polynomial overhead \cite{mcmahon2022}, making progress on Ising solvers broadly significant. This thesis studies two regimes: the \textit{ferromagnetic} case ($J_{ij} > 0$), where aligned spins are favoured and the energy landscape is relatively smooth, and the \textit{anti-ferromagnetic} case ($J_{ij} < 0$), which produces frustrated, rugged landscapes. The MaxCut problem --- partition a graph to maximise the number of crossing edges --- maps exactly to anti-ferromagnetic Ising and serves as the natural stress test for any sampler \cite{goemans1995}.
+
+The standard baseline for ground state estimation is Metropolis-Hastings (MH), whose rejection step allows the Markov chain to escape local minima and guarantees convergence to the target distribution. GPU implementations exploit the local neighbourhood structure of spin models to achieve speed-ups of up to three orders of magnitude over serial CPU code \cite{weigel2011, weigel2012}. Gibbs sampling eliminates rejection by sampling each spin directly from its conditional distribution, enabling whole colour classes of conditionally independent spins to be updated simultaneously. However, the absence of a rejection step means the sampler cannot cross low-probability barriers --- a failure mode that is particularly severe in frustrated anti-ferromagnetic systems \cite{camuto2021}. \textit{Block} Gibbs sampling updates conditionally independent groups in parallel, gaining throughput over single-site Gibbs while retaining this fundamental limitation.
+
+Extropic's Thermodynamic Sampling Unit (TSU) is built around block Gibbs, deliberately forgoing rejection in exchange for the energy efficiency that probabilistic hardware enables. Jelinčič et al.\ project performance parity with GPUs at roughly 10,000 times lower energy \cite{jelincic2025}, building on earlier work on p-bit circuits \cite{camsari2019} and sparse Ising Machines \cite{sim2021}. The THRML library \cite{thrml} simulates TSU-style block Gibbs on a conventional GPU, enabling algorithmic study before physical hardware exists at scale.
+
+Despite these advances, the empirical performance trade-offs of block Gibbs across different problem classes remain uncharacterised. It is unclear whether THRML block Gibbs achieves solution quality comparable to MH, and under which conditions its computational efficiency advantage holds. This thesis addresses that gap through a systematic three-way comparison of THRML block Gibbs, standard single-site Gibbs, and Metropolis-Hastings, all running on identical GPU hardware. Experiments cover three graph topologies --- 2D grid, random regular graph, and Erd\H{o}s--R\'{e}nyi --- across ferromagnetic Ising, anti-ferromagnetic Ising, and MaxCut instances, with system sizes up to \textbf{[TBD]} nodes and a sweep over inverse temperature $\beta$. Three research questions guide the work:
+
+\begin{enumerate}
+  \item How do the three samplers compare in solution quality across problem types and system sizes?
+  \item How does their relative performance scale with graph topology and temperature?
+  \item What are the computational efficiency trade-offs, as measured by effective samples per second and Gelman--Rubin convergence diagnostics?
+\end{enumerate}
+
+The remainder of this thesis is structured as follows: Section~\ref{sec:methods} describes the three sampler implementations; Section~\ref{sec:experiments} defines the experimental methodology; Section~\ref{sec:results} presents results; Section~\ref{sec:discussion} interprets findings in the context of existing literature; and Section~\ref{sec:conclusion} draws conclusions.
+
+\section{Methods}\label{sec:methods}
+
+\subsection{Problem Formulation}
+
+All three samplers operate on the same shared graph representation. An Ising model instance is defined by a graph $G = (V, E)$ with $n = |V|$ nodes, edge-wise coupling strengths $J_{ij} \in \mathbb{R}$, and inverse temperature $\beta > 0$. Each node $i$ carries a spin $s_i \in \{-1, +1\}$, and the energy of a configuration $\mathbf{s}$ is:
+
+\begin{equation}
+  \mathcal{E}(\mathbf{s}) = -\beta \sum_{(i,j) \in E} J_{ij}\, s_i s_j
+  \label{eq:energy}
+\end{equation}
+
+The samplers target the Boltzmann distribution $P(\mathbf{s}) \propto \exp(-\mathcal{E}(\mathbf{s}))$. For ferromagnetic instances $J_{ij} = +1$, aligned spins are energetically favoured; for anti-ferromagnetic instances $J_{ij} = -1$, opposing spins are favoured. MaxCut is handled through the same formulation by setting $J_{ij} = -1$, so that minimising \eqref{eq:energy} is equivalent to maximising the number of cut edges. The cut value is computed separately as $\text{Cut}(\mathbf{s}) = \sum_{(i,j) \in E} |J_{ij}|\,(1 - s_i s_j)/2$, which for unit weights ($|J_{ij}| = 1$) counts the number of cut edges.
+
+\subsection{Metropolis-Hastings}
+
+At each step, a node $i$ is chosen uniformly at random and a spin flip is proposed. The energy change from flipping $s_i$ depends only on the local neighbourhood $\mathcal{N}(i)$:
+
+\begin{equation}
+  \Delta\mathcal{E} = 2\beta\, s_i \sum_{j \in \mathcal{N}(i)} J_{ij}\, s_j
+  \label{eq:dE}
+\end{equation}
+
+The flip is accepted with probability $\min(1, \exp(-\Delta\mathcal{E}))$. One sweep consists of $n$ such steps. The acceptance step guarantees detailed balance and allows the chain to cross low-probability barriers, at the cost of rejected proposals that leave the state unchanged.
+
+The implementation uses a padded neighbour list of shape $[n, d_{\max}]$, where $d_{\max}$ is the maximum node degree, with a boolean mask to handle varying degree. The inner loop over $n$ steps is compiled with \texttt{jax.lax.scan}; PRNG keys are derived on-the-fly via \texttt{jax.random.fold\_in} to avoid materialising large key arrays in GPU memory. The sampler is JIT-compiled with \texttt{jax.jit} and parallelised over independent chains with \texttt{jax.vmap} \cite{jax}.
+
+\subsection{Standard Gibbs Sampling}
+
+Gibbs sampling draws each spin exactly from its conditional distribution given all neighbours, eliminating the accept/reject step entirely. For node $i$:
+
+\begin{equation}
+  P(s_i = +1 \mid \mathbf{s}_{\setminus i}) = \sigma\!\left(2\beta \sum_{j \in \mathcal{N}(i)} J_{ij}\, s_j\right)
+  \label{eq:gibbs_cond}
+\end{equation}
+
+where $\sigma$ is the sigmoid function. One sweep consists of $n$ single-node conditional updates. The implementation shares the same neighbour list structure and \texttt{lax.scan}/\texttt{vmap} pattern as MH; the only difference is replacing the Metropolis accept/reject with direct conditional sampling from \eqref{eq:gibbs_cond}.
+
+\subsection{Block Gibbs via THRML}
+
+Block Gibbs extends single-site Gibbs by updating entire groups of conditionally independent nodes in parallel. Two nodes are conditionally independent given all others if and only if they share no edge, so the natural grouping is a proper graph colouring: nodes of the same colour can be sampled simultaneously without violating the Markov property.
+
+The graph is coloured using the DSATUR greedy algorithm, producing colour classes $\mathcal{C}_1, \ldots, \mathcal{C}_k$. One block Gibbs step cycles through all classes in order; within each class, all spins are sampled in parallel from their conditionals \eqref{eq:gibbs_cond}. A 2D square grid is bipartite and requires two colours; a degree-3 random regular graph typically requires three or four. More colours mean smaller parallel blocks but the same total work per step.
+
+This sampler is implemented using the THRML library \cite{thrml}, which provides an \texttt{IsingEBM} energy model, an \texttt{IsingSamplingProgram} encoding the colour-block structure, and a \texttt{sample\_states} function that executes the schedule. The same \texttt{jax.vmap} parallelism over independent chains is applied externally.
+
+\subsection{Shared Infrastructure and Timing}
+
+All three samplers share a common warm-up phase of $n_{\mathrm{warmup}}$ sweeps that are discarded before sample collection. Samples are then collected every $n_{\mathrm{thinning}}$ sweeps to reduce autocorrelation. Wall-clock time is measured using \texttt{jax.block\_until\_ready} to ensure all GPU computation is complete before the timer stops, and a separate untimed compilation run precedes each timed run to exclude JIT overhead. This ensures wall-clock times reflect steady-state throughput and are directly comparable across samplers.
+
+\section{Experiments}\label{sec:experiments}
+
+The experiments are designed to answer the three research questions by varying problem type, graph topology, system size, and temperature independently, while holding all sampler hyperparameters fixed across conditions. This section describes the experimental design, the configurations tested, and the metrics collected.
+
+\subsection{Experimental Design}
+
+Each experiment runs all three samplers --- MH, standard Gibbs, and THRML block Gibbs --- on the same problem instance with independently sampled random initialisations, chain count, and sample budget. This ensures differences in outcome reflect algorithmic behaviour rather than initialisation or resource differences.
+
+All experiments were run on a single laptop NVIDIA RTX 3060 (6 GB VRAM). Each sampler was given $n_{\mathrm{chains}} = 50$ independent parallel chains, initialised from random spin configurations. Each chain ran $n_{\mathrm{warmup}} = 200$ warm-up sweeps (discarded), then collected $n_{\mathrm{samples}} = 500$ samples with $n_{\mathrm{thinning}} = 5$ sweeps between each sample. JIT compilation time was excluded from all timing measurements.
+
+\subsection{Problem Instances and Configurations}
+
+Four groups of configurations were benchmarked, covering the three problem types and three graph topologies.
+
+\subsubsection{Ferromagnetic and Anti-ferromagnetic Grid}
+
+A 2D square lattice with $J = +1$ (ferromagnetic) and $J = -1$ (anti-ferromagnetic) at $\beta = 1.0$. System sizes of $10{\times}10$, $20{\times}20$, and $30{\times}30$ (\textbf{[TBD up to $\approx 100{\times}100$]}) are tested to measure scaling behaviour. The 2D grid is bipartite, so THRML requires only two colour classes regardless of size.
+
+\subsubsection{Temperature Sweep}
+
+A ferromagnetic grid ($J = +1$) at inverse temperatures $\beta \in \{0.1, 0.5, 1.0, 2.0\}$, sweeping from the high-temperature disordered phase ($\beta = 0.1$) to the strongly ordered phase ($\beta = 2.0$). The system size is \textbf{[TBD, targeting $\approx 50{\times}50$]} --- larger than the $10{\times}10$ used in preliminary runs, as small systems converge easily at all temperatures and obscure sampler differences. A larger grid makes the ordered phase genuinely hard to mix on, revealing whether THRML's throughput advantage holds across the full temperature range rather than at a single operating point.
+
+\subsubsection{Random Regular Graph}
+
+A random regular graph of degree $d$ with ferromagnetic coupling $J = +1$ at $\beta = 1.0$. Node counts of 100, 400, and 900 (\textbf{[TBD]}) are tested at degree $d = 3$, with an additional sweep over degrees $d \in \{5, 50?, 100?\}$ (\textbf{[To clarify]}) at fixed node count to isolate the effect of graph density on block Gibbs parallelism. Higher degree increases the chromatic number and reduces the size of each parallel colour block.
+
+\subsubsection{MaxCut}
+
+An Erd\H{o}s--R\'{e}nyi graph with edge probability $p = 0.1$ and $J = -1$ at $\beta = 1.0$. Node counts of 100, 400, and 900 (\textbf{[TBD up to GPU memory limit]}) are tested. MaxCut on dense non-bipartite graphs is the hardest regime for Gibbs-based samplers, as frustrated anti-ferromagnetic interactions create many competing local minima between which the sampler cannot cross without rejection.
+
+\subsection{Metrics}
+
+Four metrics are recorded for each configuration and sampler:
+
+\begin{itemize}
+  \item \textbf{Solution quality}: the mean best energy (or cut value for MaxCut) found across chains, and the distribution of per-chain best values. Statistical significance of differences between samplers is assessed using the Mann-Whitney U test on the 50 per-chain best values, with effect size reported as the rank-biserial correlation $r$.
+
+  \item \textbf{Convergence}: the Gelman-Rubin $\hat{R}$ statistic \cite{gelman1992} computed on the energy trajectory across all 50 chains. Values $\hat{R} < 1.1$ indicate convergence; values substantially above 1.1 indicate chains have not mixed.
+
+  \item \textbf{Sampling efficiency}: the effective sample size (ESS) per chain, estimated via integrated autocorrelation time using the FFT, and ESS per second as the primary throughput metric.
+
+  \item \textbf{Wall-clock time and memory}: total wall time for the timed run (excluding JIT compilation), and peak GPU memory usage recorded via \texttt{jax.devices()[0].memory\_stats()}.
+\end{itemize}
+
+\section{Results}\label{sec:results}
+
+Solution quality is assessed via the Mann-Whitney U test on the 50 per-chain best values (rank-biserial $r$; ns = not significant at $\alpha = 0.05$). Convergence is assessed via $\hat{R}$; values below 1.1 indicate convergence. Throughput is reported as effective samples per second (ESS/s). \textbf{All results are preliminary at current system sizes; larger configurations are ongoing and plots will be made more legible (not side by side / log scales)}
+
+\subsection{Random Regular Graph}
+
+Figure~\ref{fig:rrg_detail} shows the energy trace and distribution for the 900-node RRG. All three samplers achieve $\hat{R} \approx 1.0$ and produce identical overlapping distributions. Solution quality is statistically indistinguishable at all sizes ($p = 1.000$, $r = 0.000$ for all pairwise comparisons). At 900 nodes, THRML achieves 3787 ESS/s versus 15.7 for MH --- a 241× speedup --- while finding exactly equivalent solutions. Figure~\ref{fig:rrg_scaling} shows wall-clock time growing steeply for MH and Gibbs with system size, while THRML remains comparatively flat. Figure~\ref{fig:rrg_diagnostics} confirms $\hat{R} \approx 1.0$ and the ESS/s gap across all sizes.
+
+\begin{figure}[h!]
+  \centering
+  \includegraphics[width=\columnwidth]{../plots/detail__ferro_rrg_900.png}
+  \caption{Energy trace and distribution for the 900-node random regular graph. All three samplers converge to identical distributions; THRML achieves 241× higher ESS/s than MH.}
+  \label{fig:rrg_detail}
+\end{figure}
+
+\begin{figure}[h!]
+  \centering
+  \includegraphics[width=0.8\columnwidth]{../plots/scaling_rrg.png}
+  \caption{Wall-clock time versus system size for the random regular graph. THRML scales more favourably than MH and standard Gibbs.}
+  \label{fig:rrg_scaling}
+\end{figure}
+
+\begin{figure}[!h]
+  \centering
+  \includegraphics[width=\columnwidth]{../plots/diagnostics_rrg.png}
+  \caption{$\hat{R}$ (left) and ESS/s (right) for the random regular graph. All samplers converge ($\hat{R} \approx 1.0$); THRML dominates throughput at every size.}
+  \label{fig:rrg_diagnostics}
+\end{figure}
+
+\subsection{Grid}
+
+Figure~\ref{fig:grid_detail} shows the $30{\times}30$ ferromagnetic grid. At this size, MH ($\hat{R} = 2.29$) and Gibbs ($\hat{R} = 1.83$) fail to converge within the sample budget, while THRML ($\hat{R} = 2.87$) also struggles but accumulates 1847 ESS/s versus 5.5 for MH (336×). No sampler finds significantly better solutions ($p > 0.29$). The wide flat distributions for MH and Gibbs in Figure~\ref{fig:grid_detail} reflect chains at different energy levels, while THRML shows a more concentrated distribution consistent with faster mixing. At $20{\times}20$, THRML remains near-converged ($\hat{R} = 1.09$) while MH and Gibbs already diverge ($\hat{R} \approx 1.7$), with a 163× ESS/s advantage. At $10{\times}10$ all samplers converge and find equivalent solutions.
+
+The anti-ferromagnetic grid follows the same pattern. One notable result at $30{\times}30$: MH finds marginally better solutions than standard Gibbs ($p = 0.022$, $r = -0.19$), the only case where the rejection step provides a measurable quality advantage.
+
+\begin{figure}[h!]
+  \centering
+  \includegraphics[width=\columnwidth]{../plots/detail__ferro_grid_30x30.png}
+  \caption{Energy trace and distribution for the $30{\times}30$ ferromagnetic grid (900 nodes). MH and Gibbs show wide flat distributions indicating poor mixing; THRML is more concentrated despite also having $\hat{R} > 1.1$.}
+  \label{fig:grid_detail}
+\end{figure}
+
+\subsection{MaxCut}
+
+At 900 nodes, no sampler converges ($\hat{R}$: MH 2.78, Gibbs 2.20, THRML 2.69). Despite this, solution quality is statistically equivalent across all comparisons ($p > 0.19$, $r \leq 0.15$). THRML achieves 71.7 ESS/s versus 1.0 for MH and 0.4 for standard Gibbs --- a 72× and 179× speedup respectively while finding indistinguishable cut values. At 100 nodes all samplers converge and find equivalent solutions, with THRML achieving 1115 ESS/s (32× over MH). Figure~\ref{fig:maxcut_diagnostics} shows $\hat{R}$ and ESS/s across sizes.
+
+\begin{figure}[h!]
+  \centering
+  \includegraphics[width=\columnwidth]{../plots/diagnostics_maxcut.png}
+  \caption{$\hat{R}$ (left) and ESS/s (right) for MaxCut. All samplers fail to converge at 400 and 900 nodes; THRML maintains a large throughput advantage throughout.}
+  \label{fig:maxcut_diagnostics}
+\end{figure}
+
+\subsection{Temperature Sweep}
+
+THRML finds statistically equivalent solutions to MH at all four temperatures ($p > 0.15$ in every case), confirming the throughput advantage is not specific to a single operating point. Figure~\ref{fig:temp_sweep} shows solution quality and wall time across temperatures. \textbf{[Preliminary: 10×10 grid; to be rerun at larger size.]}
+
+\begin{figure}[h!]
+  \centering
+  \includegraphics[width=\columnwidth]{../plots/temperature_sweep.png}
+  \caption{Solution quality and wall-clock time versus inverse temperature $\beta$ on the $10{\times}10$ ferromagnetic grid.}
+  \label{fig:temp_sweep}
+\end{figure}
+
+\section{Discussion}\label{sec:discussion}
+
+\section{Conclusion}\label{sec:conclusion}
+
+\begin{thebibliography}{00}
+
+  \bibitem{mcmahon2022} N. Mohseni, P. L. McMahon and T. Byrnes, ``Ising machines as hardware solvers of combinatorial optimization problems,'' arXiv:2204.00276, 2022.
+
+  \bibitem{weigel2012} M. Weigel, ``Performance potential for simulating spin models on GPU,'' \textit{J. Comput. Phys.}, arXiv:1101.1427, 2012.
+
+  \bibitem{weigel2011} M. Weigel and T. Yavors'kii, ``GPU accelerated Monte Carlo simulations of lattice spin models,'' arXiv:1107.5463, 2011.
+
+  \bibitem{camuto2021} C. Roussel, S. Cocco and R. Monasson, ``Barriers and dynamical paths in alternating Gibbs sampling of Restricted Boltzmann Machines,'' arXiv:2107.06013, 2021.
+
+  \bibitem{camsari2019} K. Y. Camsari, B. M. Sutton, and S. Datta, ``p-Bits for probabilistic spin logic,'' arXiv:1809.04028, 2019.
+
+  \bibitem{sim2021} K. Y. Camsari et al., ``Massively parallel probabilistic computing with Sparse Ising Machines,'' arXiv:2110.02481, 2021.
+
+  \bibitem{jelincic2025} V. Jelinčič et al., ``An efficient probabilistic hardware architecture for diffusion-like models,'' arXiv:2510.23972, 2025.
+
+  \bibitem{melanson2025} D. Melanson et al., ``Thermodynamic computing system for AI applications,'' \textit{Nat. Commun.}, 2025. doi: 10.1038/s41467-025-59011-x.
+
+  \bibitem{thrml} Extropic, ``THRML: Thermodynamic HypergRaphical Model Library,'' 2025. [Online]. Available: \url{https://docs.thrml.ai}
+
+  \bibitem{jax} J. Bradbury et al., ``JAX: composable transformations of Python+NumPy programs,'' 2018. [Online]. Available: \url{http://github.com/google/jax}
+
+  \bibitem{goemans1995} M. X. Goemans and D. P. Williamson, ``Improved approximation algorithms for maximum cut and satisfiability problems using semidefinite programming,'' \textit{J. ACM}, vol. 42, no. 6, pp. 1115--1145, 1995.
+
+  \bibitem{gelman1992} A. Gelman and D. B. Rubin, ``Inference from iterative simulation using multiple sequences,'' \textit{Statist. Sci.}, vol. 7, no. 4, pp. 457--472, 1992.
+
+\end{thebibliography}
+
+\end{document}
