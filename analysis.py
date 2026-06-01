@@ -24,7 +24,7 @@ def load_result(config_name: str, sampler: str) -> dict | None:
         "energy_trajectory": data["energy_trajectory"],  # [n_chains, n_samples]
         "best_energy": data["best_energy"],               # [n_chains]
         "wall_time": float(data["wall_time"]),
-        "peak_memory_bytes": float(data["active_memory_bytes"]) if "active_memory_bytes" in data.files else -1.0,
+        "output_memory_bytes": float(data["output_memory_bytes"]) if "output_memory_bytes" in data.files else -1.0,
     }
 
 
@@ -125,12 +125,12 @@ def plot_memory_comparison(results: dict, config_names: list[str], title: str, f
     for i, sampler in enumerate(SAMPLERS):
         mems = []
         for c in config_names:
-            v = (results.get(c, {}).get(sampler) or {}).get("peak_memory_bytes", -1.0)
+            v = (results.get(c, {}).get(sampler) or {}).get("output_memory_bytes", -1.0)
             mems.append(v / 1e6 if v >= 0 else 0.0)
         ax.bar(x + i * width, mems, width, label=LABELS[sampler], color=COLORS[sampler])
     ax.set_xticks(x + width)
     ax.set_xticklabels(config_names, rotation=30, ha="right", fontsize=8)
-    ax.set_ylabel("Active GPU memory (MB)")
+    ax.set_ylabel("Output memory (MB)")
     ax.set_title(title)
     ax.legend()
     fig.tight_layout()
@@ -186,7 +186,7 @@ def plot_quality_comparison(results: dict, config_names: list[str], title: str,
 
 def plot_temperature_sweep(results: dict) -> None:
     betas = [0.1, 0.5, 1.0, 2.0]
-    config_names = [f"ferro_grid_10x10_beta{b}" for b in betas]
+    config_names = [f"ferro_grid_60x60_beta{b}" for b in betas]
     fig, axes = plt.subplots(1, 2, figsize=(12, 4))
     for ax, metric, ylabel in zip(
         axes,
@@ -257,7 +257,7 @@ def plot_diagnostics(results: dict, config_names: list[str], title: str, fname: 
 
 def print_diagnostics_table(results: dict, config_names: list[str]) -> None:
     """Print R-hat, ESS, ESS/s, and peak memory for all configs and samplers."""
-    header = f"{'Config':<35} {'Sampler':<28} {'R-hat':>6} {'ESS':>8} {'ESS/s':>10} {'ActiveMem(MB)':>14}"
+    header = f"{'Config':<35} {'Sampler':<28} {'R-hat':>6} {'ESS':>8} {'ESS/s':>10} {'OutMem(MB)':>11}"
     print("\n" + header)
     print("-" * len(header))
     for c in config_names:
@@ -266,8 +266,8 @@ def print_diagnostics_table(results: dict, config_names: list[str]) -> None:
             if data is None:
                 continue
             d = compute_diagnostics(data)
-            mem = data.get("peak_memory_bytes", -1.0)
-            mem_str = f"{mem/1e6:>14.1f}" if mem >= 0 else f"{'N/A':>14}"
+            mem = data.get("output_memory_bytes", -1.0)
+            mem_str = f"{mem/1e6:>11.1f}" if mem >= 0 else f"{'N/A':>11}"
             print(f"{c:<35} {LABELS[sampler]:<28} {d['r_hat']:>6.3f} {d['ess']:>8.1f} {d['ess_per_sec']:>10.1f}{mem_str}")
     print()
 
@@ -280,64 +280,79 @@ if __name__ == "__main__":
 
     # --- convergence plots (key configs only) ---
     key_configs = [
-        "ferro_grid_10x10", "ferro_grid_30x30",
-        "antiferro_grid_30x30",
-        "ferro_rrg_900",
-        "maxcut_900",
+        "ferro_grid_60x60", "ferro_grid_100x100",
+        "antiferro_grid_60x60", "antiferro_grid_100x100",
+        "ferro_rrg_900", "ferro_rrg_2500",
+        "maxcut_d3_900", "maxcut_d3_2500",
+        "maxcut_d5_900", "maxcut_d5_2500",
     ]
     for c in key_configs:
         if c in results:
             plot_convergence(results, c)
 
     # --- scaling ---
-    plot_scaling(results, [f"ferro_grid_{s}x{s}" for s in [10, 20, 30]],
-                 [100, 400, 900], title="Grid ferro — scaling", fname="scaling_grid_ferro")
-    plot_scaling(results, [f"antiferro_grid_{s}x{s}" for s in [10, 20, 30]],
-                 [100, 400, 900], title="Grid antiferro — scaling", fname="scaling_grid_antiferro")
-    plot_scaling(results, [f"ferro_rrg_{n}" for n in [100, 400, 900]],
-                 [100, 400, 900], title="Random regular graph — scaling", fname="scaling_rrg")
-    plot_scaling(results, [f"maxcut_{n}" for n in [100, 400, 900]],
-                 [100, 400, 900], title="MaxCut — scaling", fname="scaling_maxcut")
+    grid_sides = [30, 60, 100]
+    grid_nodes = [s * s for s in grid_sides]
+    rrg_nodes = [400, 900, 2500]
+    maxcut_nodes = [400, 900, 2500]
+
+    plot_scaling(results, [f"ferro_grid_{s}x{s}" for s in grid_sides],
+                 grid_nodes, title="Grid ferro — scaling", fname="scaling_grid_ferro")
+    plot_scaling(results, [f"antiferro_grid_{s}x{s}" for s in grid_sides],
+                 grid_nodes, title="Grid antiferro — scaling", fname="scaling_grid_antiferro")
+    plot_scaling(results, [f"ferro_rrg_{n}" for n in rrg_nodes],
+                 rrg_nodes, title="Random regular graph — scaling", fname="scaling_rrg")
+    plot_scaling(results, [f"maxcut_d3_{n}" for n in maxcut_nodes],
+                 maxcut_nodes, title="MaxCut degree-3 — scaling", fname="scaling_maxcut_d3")
+    plot_scaling(results, [f"maxcut_d5_{n}" for n in maxcut_nodes],
+                 maxcut_nodes, title="MaxCut degree-5 — scaling", fname="scaling_maxcut_d5")
 
     # --- time comparisons ---
-    plot_time_comparison(results, [f"ferro_grid_{s}x{s}" for s in [10, 20, 30]],
+    plot_time_comparison(results, [f"ferro_grid_{s}x{s}" for s in grid_sides],
                          title="Wall-clock time — grid ferro", fname="time_grid_ferro")
-    plot_time_comparison(results, [f"antiferro_grid_{s}x{s}" for s in [10, 20, 30]],
+    plot_time_comparison(results, [f"antiferro_grid_{s}x{s}" for s in grid_sides],
                          title="Wall-clock time — grid antiferro", fname="time_grid_antiferro")
-    plot_time_comparison(results, [f"ferro_rrg_{n}" for n in [100, 400, 900]],
+    plot_time_comparison(results, [f"ferro_rrg_{n}" for n in rrg_nodes],
                          title="Wall-clock time — random regular graph", fname="time_rrg")
-    plot_time_comparison(results, [f"maxcut_{n}" for n in [100, 400, 900]],
-                         title="Wall-clock time — MaxCut", fname="time_maxcut")
+    plot_time_comparison(results, [f"maxcut_d3_{n}" for n in maxcut_nodes],
+                         title="Wall-clock time — MaxCut degree-3", fname="time_maxcut_d3")
+    plot_time_comparison(results, [f"maxcut_d5_{n}" for n in maxcut_nodes],
+                         title="Wall-clock time — MaxCut degree-5", fname="time_maxcut_d5")
 
     # --- memory comparisons ---
-    plot_memory_comparison(results, [f"ferro_grid_{s}x{s}" for s in [10, 20, 30]],
-                           title="Peak GPU memory — grid ferro", fname="memory_grid_ferro")
-    plot_memory_comparison(results, [f"antiferro_grid_{s}x{s}" for s in [10, 20, 30]],
-                           title="Peak GPU memory — grid antiferro", fname="memory_grid_antiferro")
-    plot_memory_comparison(results, [f"ferro_rrg_{n}" for n in [100, 400, 900]],
-                           title="Peak GPU memory — random regular graph", fname="memory_rrg")
-    plot_memory_comparison(results, [f"maxcut_{n}" for n in [100, 400, 900]],
-                           title="Peak GPU memory — MaxCut", fname="memory_maxcut")
+    plot_memory_comparison(results, [f"ferro_grid_{s}x{s}" for s in grid_sides],
+                           title="Output memory — grid ferro", fname="memory_grid_ferro")
+    plot_memory_comparison(results, [f"antiferro_grid_{s}x{s}" for s in grid_sides],
+                           title="Output memory — grid antiferro", fname="memory_grid_antiferro")
+    plot_memory_comparison(results, [f"ferro_rrg_{n}" for n in rrg_nodes],
+                           title="Output memory — random regular graph", fname="memory_rrg")
+    plot_memory_comparison(results, [f"maxcut_d3_{n}" for n in maxcut_nodes],
+                           title="Output memory — MaxCut degree-3", fname="memory_maxcut_d3")
+    plot_memory_comparison(results, [f"maxcut_d5_{n}" for n in maxcut_nodes],
+                           title="Output memory — MaxCut degree-5", fname="memory_maxcut_d5")
 
     # --- quality comparisons ---
-    plot_quality_comparison(results, [f"ferro_grid_{s}x{s}" for s in [10, 20, 30]],
+    plot_quality_comparison(results, [f"ferro_grid_{s}x{s}" for s in grid_sides],
                             title="Solution quality — grid ferro", fname="quality_grid_ferro")
-    plot_quality_comparison(results, [f"antiferro_grid_{s}x{s}" for s in [10, 20, 30]],
+    plot_quality_comparison(results, [f"antiferro_grid_{s}x{s}" for s in grid_sides],
                             title="Solution quality — grid antiferro", fname="quality_grid_antiferro")
-    plot_quality_comparison(results, [f"ferro_rrg_{n}" for n in [100, 400, 900]],
+    plot_quality_comparison(results, [f"ferro_rrg_{n}" for n in rrg_nodes],
                             title="Solution quality — random regular graph", fname="quality_rrg")
-    plot_quality_comparison(results, [f"maxcut_{n}" for n in [100, 400, 900]],
-                            title="Solution quality — MaxCut", fname="quality_maxcut",
+    plot_quality_comparison(results, [f"maxcut_d3_{n}" for n in maxcut_nodes],
+                            title="Solution quality — MaxCut degree-3", fname="quality_maxcut_d3",
+                            higher_is_better=True)
+    plot_quality_comparison(results, [f"maxcut_d5_{n}" for n in maxcut_nodes],
+                            title="Solution quality — MaxCut degree-5", fname="quality_maxcut_d5",
                             higher_is_better=True)
 
     # --- temperature sweep ---
     plot_temperature_sweep(results)
 
     # --- convergence diagnostics ---
-    grid_configs = [f"ferro_grid_{s}x{s}" for s in [10, 20, 30]]
-    antiferro_configs = [f"antiferro_grid_{s}x{s}" for s in [10, 20, 30]]
-    rrg_configs = [f"ferro_rrg_{n}" for n in [100, 400, 900]]
-    maxcut_configs = [f"maxcut_{n}" for n in [100, 400, 900]]
+    grid_configs = [f"ferro_grid_{s}x{s}" for s in grid_sides]
+    antiferro_configs = [f"antiferro_grid_{s}x{s}" for s in grid_sides]
+    rrg_configs = [f"ferro_rrg_{n}" for n in rrg_nodes]
+    maxcut_configs = [f"maxcut_d3_{n}" for n in maxcut_nodes] + [f"maxcut_d5_{n}" for n in maxcut_nodes]
 
     plot_diagnostics(results, grid_configs,
                      title="Diagnostics — grid ferro", fname="diagnostics_grid_ferro")
@@ -345,8 +360,10 @@ if __name__ == "__main__":
                      title="Diagnostics — grid antiferro", fname="diagnostics_grid_antiferro")
     plot_diagnostics(results, rrg_configs,
                      title="Diagnostics — random regular graph", fname="diagnostics_rrg")
-    plot_diagnostics(results, maxcut_configs,
-                     title="Diagnostics — MaxCut", fname="diagnostics_maxcut")
+    plot_diagnostics(results, [f"maxcut_d3_{n}" for n in maxcut_nodes],
+                     title="Diagnostics — MaxCut degree-3", fname="diagnostics_maxcut_d3")
+    plot_diagnostics(results, [f"maxcut_d5_{n}" for n in maxcut_nodes],
+                     title="Diagnostics — MaxCut degree-5", fname="diagnostics_maxcut_d5")
 
     # --- print diagnostics table ---
     all_configs = grid_configs + antiferro_configs + rrg_configs + maxcut_configs

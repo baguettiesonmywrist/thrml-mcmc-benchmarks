@@ -70,3 +70,10 @@ def make_maxcut_model(n_nodes: int, edge_prob: float, beta: float, seed: int = 0
     G = nx.erdos_renyi_graph(n_nodes, edge_prob, seed=seed)
     n_edges = G.number_of_edges()
     return _graph_to_model(G, np.full(n_edges, -1.0, dtype=np.float32), beta)
+
+
+def make_maxcut_rrg_model(n_nodes: int, degree: int, beta: float, seed: int = 0) -> IsingModel:
+    """MaxCut on a random regular graph. Sets J = -1 so minimising energy = maximising the cut."""
+    G = nx.random_regular_graph(degree, n_nodes, seed=seed)
+    n_edges = G.number_of_edges()
+    return _graph_to_model(G, np.full(n_edges, -1.0, dtype=np.float32), beta)
