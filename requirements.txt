@@ -1,0 +1,9 @@
+equinox==0.13.6
+jax==0.10.0
+jaxlib==0.10.0
+jaxtyping==0.3.9
+matplotlib==3.10.9
+networkx==3.6.1
+numpy==2.4.4
+scipy==1.17.1
+thrml==0.1.3

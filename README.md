@@ -19,15 +19,27 @@ Benchmarking Extropic's **THRML block Gibbs** sampler against **Metropolis–Has
 - `plot.py` - per-configuration detail plots
 - `test/` - verification scripts for each sampler and the models
 
-## Usage
+## Setup
 
-Run from the repo root using a virtualenv:
+Requires Python 3.10+ and a CUDA-capable GPU (JAX is configured for CUDA 13).
 
 ```bash
-.venv/bin/python benchmark.py     # run the benchmark -> results/
-.venv/bin/python analysis.py      # diagnostics + plots -> plots/, results_summary.txt
-.venv/bin/python significance.py  # statistical tests -> significance.txt
-.venv/bin/python plot.py          # per-config detail plots -> plots/
+python -m venv .venv
+source .venv/bin/activate
+pip install -r requirements.txt
 ```
 
-Requires Python with `jax`, `thrml`, `networkx`, `numpy`, `equinox`, `matplotlib`, and `scipy`.
+> **Note:** JAX GPU support requires matching CUDA/cuDNN drivers. The pinned versions target CUDA 13. If your environment differs, install `jax[cuda13]` separately following the [JAX installation guide](https://jax.readthedocs.io/en/latest/installation.html).
+
+## Usage
+
+Run from the repo root with the virtualenv active:
+
+```bash
+python benchmark.py     # run all samplers on every config  ->  results/
+python analysis.py      # convergence, ESS, scaling plots   ->  plots/, results_summary.txt
+python significance.py  # Mann-Whitney U tests              ->  significance.txt
+python plot.py          # per-config detail plots           ->  plots/
+```
+
+Verification scripts are in `test/` and can be run individually, e.g. `python test/verify_gibbs.py`.
