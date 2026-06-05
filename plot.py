@@ -13,16 +13,21 @@ COLORS = {"mh": "#e41a1c", "gibbs": "#377eb8", "thrml": "#4daf4a"}
 LABELS = {"mh": "Metropolis-Hastings", "gibbs": "Standard Gibbs", "thrml": "Block Gibbs (THRML)"}
 
 def _load(config_name: str, sampler: str) -> dict | None:
-    """Load run 0 for visualisation."""
-    path = os.path.join(RESULTS_DIR, f"{config_name}__{sampler}__run0.npz")
-    if not os.path.exists(path):
+    """Load and pool all runs for visualisation (matches the pooled statistics)."""
+    runs = []
+    for run_idx in range(3):
+        path = os.path.join(RESULTS_DIR, f"{config_name}__{sampler}__run{run_idx}.npz")
+        if os.path.exists(path):
+            runs.append(np.load(path))
+    if not runs:
         return None
-    d = np.load(path)
     return {
-        "energy_trajectory": d["energy_trajectory"],  # [n_chains, n_samples]
-        "best_energy": d["best_energy"],               # [n_chains]
-        "wall_time": float(d["wall_time"]),
-        "output_memory_bytes": float(d["output_memory_bytes"]) if "output_memory_bytes" in d.files else -1.0,
+        # pool chains across runs -> [n_chains * n_runs, n_samples]
+        "energy_trajectory": np.concatenate([r["energy_trajectory"] for r in runs], axis=0),
+        "best_energy": np.concatenate([r["best_energy"] for r in runs]),
+        # average wall time across runs for a stable estimate
+        "wall_time": float(np.mean([r["wall_time"] for r in runs])),
+        "output_memory_bytes": float(runs[0]["output_memory_bytes"]) if "output_memory_bytes" in runs[0].files else -1.0,
     }
 
 def _save(fig: plt.Figure, name: str) -> None:

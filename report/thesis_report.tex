@@ -15,7 +15,7 @@
 T\kern-.1667em\lower.7ex\hbox{E}\kern-.125emX}}
 \begin{document}
 
-\title{Comparing Novel Thermodynamic Computing with Traditional Graphics Processing Unit Implementations for Ground State Energy Estimation in Classical Optimization Problems\\
+\title{Benchmarking Thermodynamic Block Gibbs Sampling against Metropolis-Hastings and Single-Site Gibbs for Ground State Estimation in Classical Optimisation Problems\\
   \thanks{This thesis was prepared in partial fulfilment of the requirements for the Degree of Bachelor of Computer Science, Maastricht University. Supervisors: Georgios Stamoulis and Charis Kouzinopoulis.}
 }
 
@@ -29,11 +29,11 @@ T\kern-.1667em\lower.7ex\hbox{E}\kern-.125emX}}
 \maketitle
 
 \begin{abstract}
-  Thermodynamic computing harnesses thermal noise as a computational resource, with block Gibbs sampling as its algorithmic core. The THRML library, developed by Extropic for AI applications such as diffusion-like models and energy-based models, simulates this approach on conventional GPU hardware. This thesis evaluates whether THRML's rejection-free block Gibbs transfers effectively to classical combinatorial optimisation, benchmarking it against Metropolis-Hastings (MH) and standard single-site Gibbs on GPU. We benchmark all three samplers across ferromagnetic Ising, anti-ferromagnetic Ising, and MaxCut instances on 2D square lattices (up to $100{\times}100$ nodes) and random regular graphs (up to 2,500 nodes), with a sweep over inverse temperature $\beta$. Statistical comparisons use the Mann-Whitney U test on 150 pooled per-chain best values across three independent runs. THRML achieves two to three orders of magnitude higher effective samples per second (ESS/s) than MH and standard Gibbs across all configurations, while matching or exceeding MH in solution quality on the majority of problem instances. The quality advantage is most pronounced on MaxCut degree-5, where effect sizes grow monotonically with problem size (rank-biserial $r$ up to 0.34 vs.\ standard Gibbs at 2,500 nodes). The sole exception is the very low temperature regime ($\beta = 2.0$), where MH's rejection step yields a small but significant quality advantage. These results support the algorithmic premise of thermodynamic sampling hardware and identify MaxCut on dense graphs as the problem class where block Gibbs provides the greatest benefit over single-site methods.
+  Thermodynamic computing harnesses thermal noise as a computational resource, with rejection-free block Gibbs sampling as its algorithmic core. The THRML library simulates this approach on conventional GPUs but targets AI workloads such as energy-based and diffusion-like models. This thesis evaluates whether THRML's block Gibbs transfers to classical combinatorial optimisation, benchmarking it on GPU against Metropolis-Hastings (MH) and single-site Gibbs across ferromagnetic Ising, anti-ferromagnetic Ising, and MaxCut instances on 2D lattices (up to $100{\times}100$ nodes) and random regular graphs (up to 2,500 nodes), with a sweep over inverse temperature $\beta$. Block Gibbs achieves two to three orders of magnitude higher effective samples per second (ESS/s) than both baselines while matching or exceeding MH in solution quality on most instances (Mann-Whitney U on 150 pooled per-chain best values). The advantage is strongest on dense MaxCut (degree-5), where effect sizes grow monotonically with problem size (rank-biserial $r$ up to 0.34); the lone exception is the strongly ordered regime ($\beta = 2.0$), where MH's rejection step yields a small but significant edge. These results support the algorithmic premise of thermodynamic sampling and identify dense MaxCut as the problem class where block Gibbs benefits most.
 \end{abstract}
 
 \begin{IEEEkeywords}
-  thermodynamic computing, THRML, Ising model, MaxCut, Gibbs sampling, Block Gibbs, Metropolis-Hastings, probabilistic computing, energy-based models, EBMs
+  thermodynamic computing, block Gibbs sampling, Metropolis-Hastings, Markov chain Monte Carlo, Ising model, MaxCut, combinatorial optimisation, ground state estimation, THRML, probabilistic computing, energy-based models
 \end{IEEEkeywords}
 
 \section{Introduction}\label{sec:introduction}
@@ -44,7 +44,7 @@ The Ising model is the canonical test bed for combinatorial solvers. It assigns 
 
 The standard baseline for ground state estimation is Metropolis-Hastings (MH), whose rejection step allows the Markov chain to escape local minima and guarantees convergence to the target distribution. GPU implementations exploit the local neighbourhood structure of spin models to achieve speed-ups of up to three orders of magnitude over serial CPU code \cite{weigel2011, weigel2012}. Gibbs sampling eliminates rejection by sampling each spin directly from its conditional distribution, removing the accept/reject overhead but preventing the chain from crossing low-probability barriers---a failure mode that is particularly severe in frustrated anti-ferromagnetic systems \cite{camuto2021}. Standard single-site Gibbs serves as a natural intermediate baseline: it shares the rejection-free property of block Gibbs but without parallelism, isolating the contribution of block updates. Block Gibbs (THRML) extends this by using graph colouring to identify conditionally independent spins that can be updated simultaneously as a block, gaining throughput over single-site Gibbs while retaining this fundamental limitation.
 
-Extropic's Thermodynamic Sampling Unit (TSU) is built around block Gibbs, deliberately forgoing rejection in exchange for the energy efficiency that probabilistic hardware enables. Jelinčič et al.\ project performance parity with GPUs at roughly 10,000 times lower energy \cite{jelincic2025}, building on earlier work on p-bit circuits \cite{camsari2019} and sparse Ising Machines \cite{sim2021}. The THRML library \cite{thrml} simulates TSU-style block Gibbs on a conventional GPU, primarily targeting AI workloads such as energy-based models and diffusion-like generative models. This thesis applies THRML to classical combinatorial optimisation---Ising ground-state estimation and MaxCut---to evaluate how well its block Gibbs approach transfers beyond its intended AI domain.
+Extropic's Thermodynamic Sampling Unit (TSU) is built around block Gibbs, deliberately forgoing rejection in exchange for the energy efficiency that probabilistic hardware enables. Jelinčič et al. project performance parity with GPUs at roughly 10,000 times lower energy \cite{jelincic2025}, building on earlier work on p-bit circuits \cite{camsari2019} and sparse Ising Machines \cite{sim2021}. The THRML library \cite{thrml} simulates TSU-style block Gibbs on a conventional GPU, primarily targeting AI workloads such as energy-based models and diffusion-like generative models. This thesis applies THRML to classical combinatorial optimisation---Ising ground-state estimation and MaxCut---to evaluate how well its block Gibbs approach transfers beyond its intended AI domain.
 
 The broader landscape of Ising solvers spans a wide range of hardware paradigms \cite{mcmahon2022}. Quantum annealers---most notably D-Wave systems---exploit quantum tunnelling to escape local minima, but are currently limited to sparse, hardware-native graph topologies and relatively small qubit counts. Coherent Ising Machines based on optical parametric oscillators can tackle dense instances at optical speeds, but require specialised photonic hardware. On the probabilistic hardware side, p-bit circuits \cite{camsari2019} and sparse Ising Machines \cite{sim2021} implement rejection-free Boltzmann sampling with stochastic binary units, sharing the core philosophy of block Gibbs. Among purely software approaches, GPU-accelerated MCMC \cite{weigel2011, weigel2012} represents the accessible state-of-the-art: it exploits the local neighbourhood structure of spin models to parallelise proposals across thousands of CUDA cores. THRML bridges these paradigms by simulating probabilistic hardware-style block Gibbs on a conventional GPU, making it directly comparable to GPU MCMC baselines without requiring specialised hardware.
 
@@ -84,7 +84,7 @@ At each step, a node $i$ is chosen uniformly at random and a spin flip is propos
 
 The flip is accepted with probability $\min(1, \exp(-\Delta\mathcal{E}))$. One sweep consists of $n$ such steps. The acceptance step guarantees detailed balance and allows the chain to cross low-probability barriers, at the cost of rejected proposals that leave the state unchanged.
 
-The implementation uses a padded neighbour list of shape $[n, d_{\max}]$, where $d_{\max}$ is the maximum node degree, with a boolean mask to handle varying degree. The inner loop over $n$ steps is compiled with \texttt{jax.lax.scan}; PRNG keys are derived on-the-fly via \texttt{jax.random.fold\_in} to avoid materialising large key arrays in GPU memory. The sampler is JIT-compiled with \texttt{jax.jit} and parallelised over independent chains with \texttt{jax.vmap} \cite{jax}.
+The implementation uses a padded neighbour list of shape $[n, d_{\max}]$, where $d_{\max}$ is the maximum node degree, with a boolean mask to handle varying degree. The inner loop over $n$ steps is compiled with \texttt{jax.lax.scan}. The sampler is JIT-compiled with \texttt{jax.jit} and parallelised over independent chains with \texttt{jax.vmap} \cite{jax}.
 
 \subsection{Standard Gibbs Sampling}
 
@@ -101,7 +101,7 @@ where $\sigma$ is the sigmoid function. One sweep consists of $n$ single-node co
 
 Block Gibbs extends single-site Gibbs by updating entire groups of conditionally independent nodes in parallel. Two nodes are conditionally independent given all others if and only if they share no edge, so the natural grouping is a proper graph colouring: nodes of the same colour can be sampled simultaneously without violating the Markov property.
 
-The graph is coloured using the DSATUR greedy algorithm \cite{brelaz1979}, producing colour classes $\mathcal{C}_1, \ldots, \mathcal{C}_k$. One block Gibbs step cycles through all classes in order; within each class, all spins are sampled in parallel from their conditionals \eqref{eq:gibbs_cond}. A 2D square grid is bipartite and requires two colours; a degree-3 random regular graph typically requires three or four. More colours mean smaller parallel blocks but the same total work per step.
+The graph is coloured using the DSATUR greedy algorithm \cite{brelaz1979}, producing colour classes $\mathcal{C}_1, \ldots, \mathcal{C}_k$. One block Gibbs step cycles through all classes in order; within each class, all spins are sampled in parallel from their conditionals \eqref{eq:gibbs_cond}. A 2D square grid is bipartite and requires two colours; a degree-3 random regular graph typically requires three. More colours mean smaller parallel blocks but the same total work per step.
 
 This sampler is implemented using the THRML library \cite{thrml}, which provides an \texttt{IsingEBM} energy model, an \texttt{IsingSamplingProgram} encoding the colour-block structure, and a \texttt{sample\_states} function that executes the schedule. The same \texttt{jax.vmap} parallelism over independent chains is applied externally.
 
@@ -115,7 +115,7 @@ The experiments are designed to answer the three research questions by varying p
 
 \subsection{Experimental Design}
 
-Each experiment runs all three samplers---MH, standard Gibbs, and THRML block Gibbs---on the same problem instance with independently sampled random initialisations, chain count, and sample budget. This ensures differences in outcome reflect algorithmic behaviour rather than initialisation or resource differences.
+Each experiment runs all three samplers---MH, standard Gibbs, and THRML block Gibbs---on the same problem instance with equal chain count and sample budget, and independently sampled random initialisations. This ensures differences in outcome reflect algorithmic behaviour rather than initialisation or resource differences.
 
 All experiments were run on a single laptop NVIDIA RTX 3060 (6 GB VRAM). Each sampler was given $n_{\mathrm{chains}} = 50$ independent parallel chains, initialised from random spin configurations. Each chain ran $n_{\mathrm{warmup}} = 200$ warm-up sweeps (discarded), then collected $n_{\mathrm{samples}} = 500$ samples with $n_{\mathrm{thinning}} = 5$ sweeps between each sample. Each configuration was repeated for $N_{\mathrm{runs}} = 3$ independent runs; chains are pooled across runs (150 total per sampler) for statistical analysis. JIT compilation time was excluded from all timing measurements.
 
@@ -133,7 +133,7 @@ A ferromagnetic grid ($J = +1$) at inverse temperatures $\beta \in \{0.1, 0.5, 1
 
 \subsubsection{Random Regular Graph}
 
-A random regular graph of degree $d = 3$ with ferromagnetic coupling $J = +1$ at $\beta = 1.0$. Node counts of 900, 1,600, and 2,500 are tested to measure scaling behaviour; these sizes were chosen to span a comparable node-count range to the grid experiments under the same VRAM budget. Unlike the grid, a degree-3 RRG is not bipartite and typically requires three or four colour classes under DSATUR.
+A random regular graph of degree $d = 3$ with ferromagnetic coupling $J = +1$ at $\beta = 1.0$. Node counts of 900, 1,600, and 2,500 are tested to measure scaling behaviour; these sizes were chosen to span a comparable node-count range to the grid experiments under the same VRAM budget. Unlike the grid, a degree-3 RRG is not bipartite and requires three colour classes under DSATUR (rising to four at degree 5).
 
 \subsubsection{MaxCut}
 
@@ -146,11 +146,11 @@ Four metrics are recorded for each configuration and sampler:
 \begin{itemize}
   \item \textbf{Solution quality}: the mean best energy (or cut value for MaxCut) found across chains, and the distribution of per-chain best values. Statistical significance of differences between samplers is assessed using the Mann-Whitney U test on the 150 pooled per-chain best values ($3\ \text{runs} \times 50\ \text{chains}$), with effect size reported as the rank-biserial correlation $r$.
 
-  \item \textbf{Convergence}: the Gelman-Rubin $\hat{R}$ statistic \cite{gelman1992} computed on the energy trajectory across all 50 chains. Values $\hat{R} < 1.1$ indicate convergence; values substantially above 1.1 indicate chains have not mixed.
+  \item \textbf{Convergence}: the Gelman-Rubin $\hat{R}$ statistic \cite{gelman1992} computed on the energy trajectory (cut value for MaxCut) across all 150 chains. Values $\hat{R} < 1.1$ indicate convergence; values substantially above 1.1 indicate chains have not mixed.
 
-  \item \textbf{Sampling efficiency}: the effective sample size (ESS) per chain, estimated via integrated autocorrelation time using the FFT \cite{geyer1992}, and ESS per second as the primary throughput metric.
+  \item \textbf{Sampling efficiency}: the effective sample size (ESS) of the per-chain energy series (cut value for MaxCut), estimated via integrated autocorrelation time using the FFT \cite{geyer1992}, and ESS per second as the primary throughput metric.
 
-  \item \textbf{Wall-clock time}: total wall time for the timed run, excluding JIT compilation.
+  \item \textbf{Wall-clock time}: mean wall time across the three runs, excluding JIT compilation.
 \end{itemize}
 
 \section{Results}\label{sec:results}
@@ -159,7 +159,7 @@ Results are reported across four experiment groups: grid ferromagnetic, grid ant
 
 \subsection{Grid: Ferromagnetic and Anti-ferromagnetic}
 
-Table~\ref{tab:significance} summarises the statistical comparisons. On ferromagnetic grids, solution quality differences between THRML and MH are not significant at any size ($p > 0.25$). Both THRML and MH significantly outperform standard Gibbs at $70{\times}70$ and $100{\times}100$ ($p < 0.0001$, $|r| = 0.30$--$0.48$), with the gap widening with system size. On anti-ferromagnetic grids the same pattern holds, with the additional result that at $100{\times}100$ THRML significantly outperforms MH ($p = 0.0012$, $r = -0.214$, $**$).
+Table~\ref{tab:significance} summarises the statistical comparisons. On ferromagnetic grids, solution quality differences between THRML and MH are not significant at any size ($p > 0.25$). Both THRML and MH significantly outperform standard Gibbs at $70{\times}70$ and $100{\times}100$ ($p < 0.0001$, $|r| = 0.30$--$0.48$), with the gap widening with system size. On anti-ferromagnetic grids the same pattern holds, with the additional result that at $100{\times}100$ THRML significantly outperforms MH ($p = 0.0012$, $r = -0.214$).
 
 Gelman-Rubin diagnostics reveal that all three samplers fail to converge within the sample budget on grid instances: $\hat{R}$ ranges from 1.18 to 1.82 across all grid configurations (Figure~\ref{fig:diagnostics_grid_ferro}). Figure~\ref{fig:convergence_grid} shows the energy trace for the $100{\times}100$ ferromagnetic grid: all three samplers are still descending at the end of the sample window, confirming incomplete mixing. Despite this shared failure to converge, sampling efficiency differs by orders of magnitude: at $50{\times}50$, THRML achieves 604.7 ESS/s compared to 0.8 for MH and 0.1 for standard Gibbs---a 756$\times$ gap over MH. At $100{\times}100$, THRML achieves 13.8 ESS/s while both MH and Gibbs fall below 0.05 ESS/s. Wall-clock time scales steeply for MH and Gibbs as system size grows (Figure~\ref{fig:scaling_grid}), while THRML's block parallelism partially offsets this cost.
 
@@ -186,7 +186,7 @@ Gelman-Rubin diagnostics reveal that all three samplers fail to converge within 
 
 \subsection{Temperature Sweep}
 
-At high temperature ($\beta = 0.1$), all three samplers converge fully ($\hat{R} = 1.000$) and produce statistically equivalent solution quality ($p > 0.06$). THRML achieves 3,462 ESS/s at $\beta = 0.1$ compared to 2.9 for MH and 2.8 for standard Gibbs---a 1,194$\times$ gap. As temperature decreases, $\hat{R}$ rises for all samplers and ESS/s falls. At $\beta = 2.0$, MH significantly outperforms THRML in solution quality ($p = 0.028$, $r = 0.125$, $*$), while both outperform standard Gibbs ($p < 0.003$). Figure~\ref{fig:temperature_sweep} shows solution quality and wall-clock time as functions of $\beta$.
+At high temperature ($\beta = 0.1$), all three samplers converge fully ($\hat{R} = 1.000$) and produce statistically equivalent solution quality ($p > 0.06$). THRML achieves 3,462 ESS/s at $\beta = 0.1$ compared to 2.9 for MH and 2.8 for standard Gibbs---a 1,194$\times$ gap. As temperature decreases, $\hat{R}$ rises for all samplers and ESS/s falls. At $\beta = 2.0$, MH significantly outperforms THRML in solution quality ($p = 0.028$, $r = 0.125$), while both outperform standard Gibbs ($p < 0.003$). Figure~\ref{fig:temperature_sweep} shows solution quality and wall-clock time as functions of $\beta$.
 
 \begin{figure}[h]
   \centering
@@ -197,12 +197,12 @@ At high temperature ($\beta = 0.1$), all three samplers converge fully ($\hat{R}
 
 \subsection{Random Regular Graph}
 
-All three samplers converge fully on ferromagnetic RRG instances: $\hat{R} \leq 1.001$ across all sizes, providing a clean baseline for comparing throughput. At 900 nodes all samplers find identical mean best energy ($-1350.00$, $p = 1.0$). At 1,600 nodes THRML marginally but significantly outperforms both MH and Gibbs ($p = 0.032$, $r = -0.040$, $*$; $p = 0.003$, $r = -0.067$, $**$); at 2,500 nodes differences are not significant. THRML ESS/s is 325$\times$ higher than MH at 900 nodes (4,527 vs.\ 13.9) and 781$\times$ higher at 2,500 nodes (3,904 vs.\ 5.0), with all three samplers producing statistically equivalent solution quality at all sizes. Figure~\ref{fig:ess_scaling_rrg} shows how ESS/s scales with system size for each sampler.
+All three samplers converge fully on ferromagnetic RRG instances: $\hat{R} \leq 1.001$ across all sizes, providing a clean baseline for comparing throughput. At 900 nodes all samplers find identical mean best energy ($-1350.00$, $p = 1.0$); at 1,600 nodes the difference reaches significance ($p = 0.032$ vs.\ MH, $p = 0.003$ vs.\ Gibbs) but the effect is negligible ($r = -0.040$ and $r = -0.067$); and at 2,500 nodes differences are not significant. In practical terms, solution quality is therefore equivalent across all three samplers at every size. By contrast, sampling efficiency differs sharply: THRML ESS/s is 325$\times$ higher than MH at 900 nodes (4,527 vs.\ 13.9) and 781$\times$ higher at 2,500 nodes (3,904 vs.\ 5.0). Figure~\ref{fig:ess_scaling_rrg} shows how ESS/s scales with system size for each sampler.
 
 \begin{figure}[h]
   \centering
   \includegraphics[width=0.95\columnwidth]{ess_scaling_rrg.png}
-  \caption{ESS/s vs.\ number of nodes on log scale for the ferromagnetic RRG. THRML maintains two to three orders of magnitude higher throughput than MH and standard Gibbs at all sizes, while solution quality is statistically equivalent.}
+  \caption{ESS/s vs.\ number of nodes on log scale for the ferromagnetic RRG. THRML maintains two to three orders of magnitude higher throughput than MH and standard Gibbs at all sizes, while solution quality is near-identical.}
   \label{fig:ess_scaling_rrg}
 \end{figure}
 
@@ -210,11 +210,11 @@ All three samplers converge fully on ferromagnetic RRG instances: $\hat{R} \leq 
 
 \subsubsection{Degree 3}
 
-$\hat{R}$ values remain below 1.04 for all samplers at all sizes, indicating near-convergence. THRML achieves higher mean best cut value at 900 nodes ($p = 0.027$, $r = 0.147$, $*$) and 2,500 nodes ($p = 0.003$, $r = 0.199$, $**$; vs.\ Gibbs $p = 0.0009$, $r = 0.222$, $***$); differences are not significant at 1,600 nodes. MH and standard Gibbs are statistically equivalent at all sizes. THRML ESS/s exceeds that of MH by factors of 470 to 1,060 across the three sizes.
+$\hat{R}$ values remain below 1.04 for all samplers at all sizes, indicating near-convergence. THRML achieves higher mean best cut value at 900 nodes ($p = 0.027$, $r = 0.147$) and 2,500 nodes ($p = 0.003$, $r = 0.199$; vs.\ Gibbs $p = 0.0009$, $r = 0.222$); differences are not significant at 1,600 nodes. MH and standard Gibbs are statistically equivalent at all sizes. THRML ESS/s exceeds that of MH by factors of 470 to 1,060 across the three sizes.
 
 \subsubsection{Degree 5}
 
-MaxCut degree-5 produces the strongest and most consistent quality advantage for THRML (Figure~\ref{fig:quality_maxcut_d5}). THRML significantly outperforms MH at all three sizes ($p = 0.013$, $r = 0.165$ at 900 nodes; $p = 0.012$, $r = 0.168$ at 1,600 nodes; $p = 0.0001$, $r = 0.265$ at 2,500 nodes). THRML also outperforms standard Gibbs at 1,600 and 2,500 nodes ($p = 0.038$, $r = 0.138$; $p < 0.0001$, $r = 0.336$). Effect sizes grow monotonically with problem size for both comparisons: vs.\ MH, $r$ increases from 0.165 to 0.168 to 0.265; vs.\ Gibbs, from 0.094 to 0.138 to 0.336. $\hat{R}$ remains below 1.09 for all samplers. Figure~\ref{fig:diagnostics_maxcut_d5} shows ESS/s: THRML achieves 671, 386, and 229 ESS/s at sizes 900, 1,600, and 2,500 respectively, compared to below 2.0 for MH and Gibbs at all sizes---a gap of 115$\times$ to 350$\times$.
+MaxCut degree-5 produces the strongest and most consistent quality advantage for THRML (Figure~\ref{fig:quality_maxcut_d5}). THRML significantly outperforms MH at all three sizes ($p = 0.013$, $r = 0.165$ at 900 nodes; $p = 0.012$, $r = 0.168$ at 1,600 nodes; $p = 0.0001$, $r = 0.265$ at 2,500 nodes). THRML also outperforms standard Gibbs at 1,600 and 2,500 nodes ($p = 0.038$, $r = 0.138$; $p < 0.0001$, $r = 0.336$). Effect sizes grow monotonically with problem size for both comparisons: vs.\ MH, $r$ increases from 0.165 to 0.168 to 0.265; vs.\ Gibbs, from 0.094 to 0.138 to 0.336. $\hat{R}$ remains below 1.09 for all samplers. Figure~\ref{fig:diagnostics_maxcut_d5} shows ESS/s: THRML achieves 671, 386, and 229 ESS/s at sizes 900, 1,600, and 2,500 respectively, compared to below 2.0 for MH and Gibbs at all sizes---a gap of 350$\times$ to 760$\times$.
 
 \begin{figure}[h]
   \centering
@@ -226,7 +226,7 @@ MaxCut degree-5 produces the strongest and most consistent quality advantage for
 \begin{figure}[h]
   \centering
   \includegraphics[width=0.95\columnwidth]{quality_maxcut_d5.png}
-  \caption{Mean best cut value across samplers for MaxCut degree-5. Higher is better. Error bars show standard deviation across 150 pooled chains.}
+  \caption{Distribution of per-chain best cut values across samplers for MaxCut degree-5 (150 pooled chains), one panel per system size with independent vertical axes. Box = interquartile range, central line = median, whiskers = $1.5\times$IQR, points = outliers. Higher is better; THRML's median rises above both baselines, most clearly at 2,500 nodes.}
   \label{fig:quality_maxcut_d5}
 \end{figure}
 

@@ -4,6 +4,7 @@ from collections import defaultdict
 import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
+from matplotlib.patches import Patch
 import numpy as np
 
 RESULTS_DIR = "results"
@@ -74,8 +75,10 @@ def effective_sample_size(chain: np.ndarray) -> float:
     centered = chain - chain.mean()
     # autocorrelation via FFT
     acf_full = np.fft.irfft(np.abs(np.fft.rfft(centered, n=2 * n)) ** 2)
+    if acf_full[0] == 0:
+        return float(n)  # constant chain: no autocorrelation, all samples independent
     acf = acf_full[:n] / acf_full[0]
-    # Geyer's initial monotone sequence: sum until first negative lag
+    # Geyer's initial positive sequence: sum until first negative lag
     tau = 1.0
     for k in range(1, n):
         if acf[k] < 0:
@@ -193,19 +196,42 @@ def plot_ess_scaling(results: dict, config_names: list[str], sizes: list[int], t
 
 def plot_quality_comparison(results: dict, config_names: list[str], title: str,
                             fname: str, higher_is_better: bool = False) -> None:
-    x = np.arange(len(config_names))
-    width = 0.25
-    fig, ax = plt.subplots(figsize=(max(6, len(config_names) * 1.8), 4))
-    for i, sampler in enumerate(SAMPLERS):
-        vals = [results.get(c, {}).get(sampler, {}).get("best_energy", np.array([np.nan])).mean()
-                for c in config_names]
-        ax.bar(x + i * width, vals, width, label=LABELS[sampler], color=COLORS[sampler])
-    ax.set_xticks(x + width)
-    ax.set_xticklabels(config_names, rotation=30, ha="right", fontsize=8)
-    ax.set_ylabel("Mean best cut value" if higher_is_better else "Mean best energy")
-    ax.set_title(title)
-    ax.legend()
-    fig.tight_layout()
+    """One box-plot panel per configuration (independent y-axes) showing the
+    distribution of per-chain best values (150 pooled chains) for each sampler.
+
+    Independent y-axes keep small-but-significant differences visible even though
+    absolute energy/cut scales differ widely across problem sizes. These are the
+    same per-chain best values the Mann-Whitney U test operates on.
+    """
+    n_cfg = len(config_names)
+    fig, axes = plt.subplots(1, n_cfg, figsize=(max(6, n_cfg * 2.6), 4.2))
+    if n_cfg == 1:
+        axes = [axes]
+
+    for ax, c in zip(axes, config_names):
+        for k, sampler in enumerate(SAMPLERS):
+            d = results.get(c, {}).get(sampler)
+            vals = np.asarray(d["best_energy"]) if d is not None else np.array([np.nan])
+            bp = ax.boxplot(
+                [vals], positions=[k], widths=0.6,
+                patch_artist=True, manage_ticks=False,
+                medianprops=dict(color="black", linewidth=1.2),
+                flierprops=dict(marker="o", markersize=2, markerfacecolor=COLORS[sampler],
+                                markeredgecolor=COLORS[sampler], alpha=0.4),
+            )
+            bp["boxes"][0].set(facecolor=COLORS[sampler], alpha=0.65, edgecolor=COLORS[sampler])
+            for part in bp["whiskers"] + bp["caps"]:
+                part.set(color=COLORS[sampler])
+        ax.set_xticks([])
+        ax.set_xlim(-0.5, len(SAMPLERS) - 0.5)
+        ax.set_title(c, fontsize=9)
+        ax.tick_params(axis="y", labelsize=8)
+
+    axes[0].set_ylabel("Best cut value per chain" if higher_is_better else "Best energy per chain")
+    fig.legend(handles=[Patch(facecolor=COLORS[s], alpha=0.65, label=LABELS[s]) for s in SAMPLERS],
+               loc="lower center", ncol=3, fontsize=9, frameon=False, bbox_to_anchor=(0.5, 0.0))
+    fig.suptitle(title, fontweight="bold")
+    fig.tight_layout(rect=[0, 0.07, 1, 0.95])
     _save(fig, fname)
 
 def plot_temperature_sweep(results: dict) -> None:
