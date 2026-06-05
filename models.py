@@ -20,7 +20,7 @@ def maxcut_value(model: IsingModel, spins: Array) -> Array:
     edge_products = spins[model.edge_src] * spins[model.edge_dst]
     return jnp.sum(jnp.abs(model.J) * (1 - edge_products) / 2)
 
-# --- Graph constructors ---
+# --- graph constructors ---
 
 def _graph_to_model(G: nx.Graph, J_vals: np.ndarray, beta: float) -> IsingModel:
     """Convert a NetworkX graph + edge weights into an IsingModel."""
@@ -56,16 +56,3 @@ def make_maxcut_rrg_model(n_nodes: int, degree: int, beta: float, seed: int = 0)
     G = nx.random_regular_graph(degree, n_nodes, seed=seed)
     n_edges = G.number_of_edges()
     return _graph_to_model(G, np.full(n_edges, -1.0, dtype=np.float32), beta)
-
-# Unused, switched to RRG
-# def make_random_model(n_nodes: int, edge_prob: float, J: float, beta: float, seed: int = 0) -> IsingModel:
-#     """Erdos-Renyi random graph Ising model."""
-#     G = nx.erdos_renyi_graph(n_nodes, edge_prob, seed=seed)
-#     n_edges = G.number_of_edges()
-#     return _graph_to_model(G, np.full(n_edges, J, dtype=np.float32), beta)
-#
-# def make_maxcut_model(n_nodes: int, edge_prob: float, beta: float, seed: int = 0) -> IsingModel:
-#     """MaxCut on an Erdos-Renyi graph. Sets J = -1 so minimising energy = maximising the cut."""
-#     G = nx.erdos_renyi_graph(n_nodes, edge_prob, seed=seed)
-#     n_edges = G.number_of_edges()
-#     return _graph_to_model(G, np.full(n_edges, -1.0, dtype=np.float32), beta)

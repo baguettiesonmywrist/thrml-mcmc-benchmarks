@@ -15,7 +15,7 @@ Benchmarking Extropic's **THRML block Gibbs** sampler against **Metropolis–Has
 - `models.py` - Ising model + graph builders (2D grid, random regular graph, MaxCut) and energy/cut functions
 - `benchmark.py` - runs all samplers on every configuration; writes `results/*.npz`
 - `analysis.py` - convergence (R-hat), ESS / ESS-per-second, plots; writes `plots/` and `results_summary.txt`
-- `significance.py` - Mann–Whitney U tests on per-chain best values; writes `significance.txt`
+- `significance.py` - Mann-Whitney U tests on per-chain best values; writes `significance.txt`
 - `plot.py` - per-configuration detail plots
 - `test/` - verification scripts for each sampler and the models
 

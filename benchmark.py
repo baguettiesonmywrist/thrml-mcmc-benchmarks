@@ -38,7 +38,7 @@ class BenchmarkResult:
     energy_trajectory: np.ndarray  # [n_chains, n_samples] energy at each sample
     best_energy: np.ndarray        # [n_chains] minimum energy found per chain
     wall_time: float               # seconds, excludes jit compilation
-    output_memory_bytes: float     # output array footprint: n_chains × n_samples × n_nodes × 4 bytes
+    output_memory_bytes: float     # output array footprint
 
 def _run_sampler(
     key: jax.Array,
@@ -129,7 +129,7 @@ def make_configs() -> list[BenchmarkConfig]:
 
     sampling_kwargs = dict(n_chains=50, n_warmup=200, n_samples=500, steps_per_sample=5)
 
-    # sweep over system sizes: 2500, 4900, 10000 nodes
+    # ferro and anti-ferro
     for side in [50, 70, 100]:
         configs.append(BenchmarkConfig(
             name=f"ferro_grid_{side}x{side}",
@@ -162,7 +162,7 @@ def make_configs() -> list[BenchmarkConfig]:
             **sampling_kwargs,
         ))
 
-    # maxcut on random regular graph - degree sweep at same sizes as RRG
+    # maxcut on random regular graph
     for degree in [3, 5]:
         for n_nodes in [900, 1600, 2500]:
             configs.append(BenchmarkConfig(

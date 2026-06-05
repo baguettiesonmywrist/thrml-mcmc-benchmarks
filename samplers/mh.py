@@ -62,7 +62,6 @@ def run_mh(
     n = model.n_nodes
     beta = model.beta
 
-    # split once into two keys - avoids materialising O(n * n_sweeps) keys in GPU memory
     warmup_key, sample_key = jax.random.split(key)
 
     def do_sweep(spins: Array, sweep_key: Key) -> Array:

@@ -58,7 +58,6 @@ def run_thrml(
     """Run THRML block Gibbs sampling on an Ising model.
 
     Non-adjacent nodes (same colour group) are updated in parallel within each step.
-    This is the key difference from standard Gibbs which updates one node at a time.
 
     Args:
         key:              JAX PRNG key
