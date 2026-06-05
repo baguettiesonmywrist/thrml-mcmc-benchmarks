@@ -64,7 +64,7 @@ The remainder of this thesis is structured as follows: Section~\ref{sec:methods}
 
 \subsection{Problem Formulation}
 
-All three samplers operate on the same shared graph representation. An Ising model instance is defined by a graph $G = (V, E)$ with $n = |V|$ nodes, edge-wise coupling strengths $J_{ij} \in \mathbb{R}$, and inverse temperature $\beta > 0$. Each node $i$ carries a spin $s_i \in \{-1, +1\}$, and the energy of a configuration $\mathbf{s}$ is:
+All three samplers operate on the same shared graph representation. Because THRML is built on JAX, all three are implemented in JAX so they share an identical compilation path and device, and throughput differences reflect the sampling algorithms rather than the framework. An Ising model instance is defined by a graph $G = (V, E)$ with $n = |V|$ nodes, edge-wise coupling strengths $J_{ij} \in \mathbb{R}$, and inverse temperature $\beta > 0$. Each node $i$ carries a spin $s_i \in \{-1, +1\}$, and the energy of a configuration $\mathbf{s}$ is:
 
 \begin{equation}
   \mathcal{E}(\mathbf{s}) = -\beta \sum_{(i,j) \in E} J_{ij}\, s_i s_j
@@ -227,7 +227,7 @@ All three samplers converge fully on ferromagnetic RRG instances: $\hat{R} \leq 
 
 \begin{figure}[h]
   \centering
-  \includegraphics[width=0.95\columnwidth]{ess_scaling_rrg.png}
+  \includegraphics[width=0.9\columnwidth]{ess_scaling_rrg.png}
   \caption{ESS/s vs.\ number of nodes on log scale for the ferromagnetic RRG. THRML maintains two to three orders of magnitude higher throughput than MH and standard Gibbs at all sizes, while solution quality is near-identical.}
   \label{fig:ess_scaling_rrg}
 \end{figure}
@@ -244,8 +244,8 @@ MaxCut degree-5 produces the strongest and most consistent quality advantage for
 
 \begin{figure}[h]
   \centering
-  \includegraphics[width=0.95\columnwidth]{quality_maxcut_d5.png}
-  \caption{Distribution of per-chain best cut values across samplers for MaxCut degree-5, one panel per system size with independent vertical axes. Box = interquartile range, central line = median, whiskers = $1.5\times$IQR, points = outliers. Higher is better; THRML's median rises above both baselines, most clearly at 2,500 nodes.}
+  \includegraphics[width=0.94\columnwidth]{quality_maxcut_d5.png}
+  \caption{Distribution of per-chain best cut values across samplers for MaxCut degree-5, one panel per system size with independent vertical axes. THRML's median rises above both baselines, most clearly at 2,500 nodes.}
   \label{fig:quality_maxcut_d5}
 \end{figure}
 

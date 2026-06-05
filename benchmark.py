@@ -23,7 +23,7 @@ RESULTS_DIR = "results"
 
 @dataclass
 class BenchmarkConfig:
-    name: str               # unique identifier for this config, used in filenames
+    name: str               # unique identifier for this config
     model: IsingModel       # the problem instance
     problem: str            # "ferro", "antiferro", or "maxcut"
     n_chains: int           # number of parallel chains (vmap)
@@ -75,7 +75,6 @@ def _run_sampler(
 
     # samples: [n_chains, n_samples, n_nodes]
     # compute energy or cut value one chain at a time to avoid OOM on dense graphs
-    # double vmap would materialise [n_chains, n_samples, n_edges] intermediates
     if config.problem == "maxcut":
         metric_fn = lambda s: maxcut_value(config.model, s)
     else:
