@@ -29,7 +29,7 @@ source .venv/bin/activate
 pip install -r requirements.txt
 ```
 
-> **Note:** JAX GPU support requires matching CUDA/cuDNN drivers. The pinned versions target CUDA 13. If your environment differs, install `jax[cuda13]` separately following the [JAX installation guide](https://jax.readthedocs.io/en/latest/installation.html).
+> **Note:** JAX GPU support requires matching CUDA/cuDNN drivers. The pinned versions target CUDA 13.
 
 ## Usage
 
